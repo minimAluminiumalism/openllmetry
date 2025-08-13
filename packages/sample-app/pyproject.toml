@@ -55,6 +55,9 @@ ibm-watson-machine-learning = "^1.0.367"
 ollama = "^0.4.7"
 mcp = "^1.7.1"
 openai-agents = "^0.0.19"
+hatchling = "^1.27.0"
+hatch = "^1.14.1"
+build = "^1.2.2.post1"
 
 
 [tool.poetry.dependencies.opentelemetry-instrumentation-openai]

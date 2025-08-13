@@ -1,0 +1,77 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"user","content":"Hello, test message for disabled
+      GenAI entry"}],"model":"gpt-3.5-turbo","max_tokens":10}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      content-length:
+      - '127'
+      content-type:
+      - application/json
+      host:
+      - localhost:5002
+      traceparent:
+      - 00-f27d923732100f7e72602cfc9ffba2b7-da76f5963009fa1a-01
+      user-agent:
+      - OpenAI/Python 1.59.7
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.59.7
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.1
+    method: POST
+    uri: http://localhost:5002/v1/chat/completions
+  response:
+    body:
+      string: "{\"id\":\"chatcmpl-2nYZXNHxx1PeK1u8xXcE1Fqr1U6Ve\",\"object\":\"chat.completion\",\"created\":1753728963,\"model\":\"gpt-3.5-turbo\",\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":50,\"total_tokens\":60},\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"In
+        the observability department, Prometheus, Grafana, Jaeger, and Loki were stressed.
+        Prometheus groaned, \\\"12-hour backfills\u20148 a.m., 8 p.m.\u2014just to
+        keep up.\\\" Grafana flipped her hair, \\\"47 dashboards, all screaming 'CRITICAL'\u2014users
+        want real-time, not 'click here for yesterday's query.'\\\" Jaeger crossed
+        arms, \\\"Agents breaking daily. A dev traced a Python function, sent telemetry
+        to my email. Spent hours deleting 200 emails!\\\" Loki smirked, \\\"And logs?
+        A mountain. We argue Jaeger vs. Zipkin vs. Tempo\u2014we forgot the goal:
+        understanding what\u2019s really happening*.\\\"@@@@\\n\\nIn the observability
+        department, Prometheus, Grafana, Jaeger, and Loki were stressed. Prometheus
+        groaned, \\\"12-hour backfills\u20148 a.m., 8 p.m.\u2014just to keep up.\\\"
+        Grafana flipped her hair, \\\"47 dashboards, all screaming 'CRITICAL'\u2014users
+        want real-time, not 'click here for yesterday's query.'\\\" Jaeger crossed
+        arms, \\\"Agents breaking daily. A dev traced a Python function, sent telemetry
+        to my email. Spent hours deleting 200 emails!\\\" Loki smirked, \\\"And logs?
+        A mountain. We argue Jaeger vs. Zipkin vs. Tempo\u2014we forgot the goal:
+        understanding what\u2019s really happening*.\\\"\\n\\nThen OpenTelemetry walked
+        in, hoodie (open source) and a brick-sized laptop. \\\"Overcomplicating,\\\"
+        they said. \\\"I\u2019m here to unify.\\\"\\n\\n\\n\\n\"},\"finish_reason\":\"stop\",\"index\":0}]}"
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '1592'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 28 Jul 2025 18:56:03 GMT
+      Etag:
+      - W/"638-XO5VafwSCmOhQjoyAbhmnhQqQ1Y"
+      X-Powered-By:
+      - Express
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -39,6 +39,9 @@ from opentelemetry.instrumentation.openai.utils import (
     should_emit_events,
     should_send_prompts,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    with_genai_entry_detection,
+)
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.metrics import Counter, Histogram
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
@@ -64,6 +67,7 @@ logger = logging.getLogger(__name__)
 
 
 @_with_chat_telemetry_wrapper
+@with_genai_entry_detection
 def chat_wrapper(
     tracer: Tracer,
     token_counter: Counter,
@@ -161,6 +165,7 @@ def chat_wrapper(
 
 
 @_with_chat_telemetry_wrapper
+@with_genai_entry_detection
 async def achat_wrapper(
     tracer: Tracer,
     token_counter: Counter,
@@ -269,7 +274,8 @@ async def _handle_request(span, kwargs, instance):
                 MessageEvent(
                     content=message.get("content"),
                     role=message.get("role"),
-                    tool_calls=_parse_tool_calls(message.get("tool_calls", None)),
+                    tool_calls=_parse_tool_calls(
+                        message.get("tool_calls", None)),
                 )
             )
     else:
@@ -420,7 +426,8 @@ async def _set_prompts(span, messages):
                 content = json.dumps(content)
             _set_span_attribute(span, f"{prefix}.content", content)
         if msg.get("tool_call_id"):
-            _set_span_attribute(span, f"{prefix}.tool_call_id", msg.get("tool_call_id"))
+            _set_span_attribute(
+                span, f"{prefix}.tool_call_id", msg.get("tool_call_id"))
         tool_calls = msg.get("tool_calls")
         if tool_calls:
             for i, tool_call in enumerate(tool_calls):
@@ -476,9 +483,11 @@ def _set_completions(span, choices):
         _set_span_attribute(span, f"{prefix}.role", message.get("role"))
 
         if message.get("refusal"):
-            _set_span_attribute(span, f"{prefix}.refusal", message.get("refusal"))
+            _set_span_attribute(
+                span, f"{prefix}.refusal", message.get("refusal"))
         else:
-            _set_span_attribute(span, f"{prefix}.content", message.get("content"))
+            _set_span_attribute(
+                span, f"{prefix}.content", message.get("content"))
 
         function_call = message.get("function_call")
         if function_call:
@@ -533,7 +542,8 @@ def _set_streaming_token_metrics(
     # If API response doesn't have usage, fallback to tiktoken calculation
     if prompt_usage == -1 or completion_usage == -1:
         model_name = (
-            complete_response.get("model") or request_kwargs.get("model") or "gpt-4"
+            complete_response.get("model") or request_kwargs.get(
+                "model") or "gpt-4"
         )
 
         # Calculate prompt tokens if not available from API
@@ -543,7 +553,8 @@ def _set_streaming_token_metrics(
                 if msg.get("content"):
                     prompt_content += msg.get("content")
             if model_name and should_record_stream_token_usage():
-                prompt_usage = get_token_count_from_string(prompt_content, model_name)
+                prompt_usage = get_token_count_from_string(
+                    prompt_content, model_name)
 
         # Calculate completion tokens if not available from API
         if completion_usage == -1 and complete_response.get("choices"):
@@ -566,7 +577,8 @@ def _set_streaming_token_metrics(
                 **shared_attributes,
                 SpanAttributes.LLM_TOKEN_TYPE: "input",
             }
-            token_counter.record(prompt_usage, attributes=attributes_with_token_type)
+            token_counter.record(
+                prompt_usage, attributes=attributes_with_token_type)
 
         if isinstance(completion_usage, int) and completion_usage >= 0:
             attributes_with_token_type = {
@@ -660,7 +672,8 @@ class ChatStream(ObjectProxy):
             return chunk
 
     def _process_item(self, item):
-        self._span.add_event(name=f"{SpanAttributes.LLM_CONTENT_COMPLETION_CHUNK}")
+        self._span.add_event(
+            name=f"{SpanAttributes.LLM_CONTENT_COMPLETION_CHUNK}")
 
         if self._first_token and self._streaming_time_to_first_token:
             self._time_of_first_token = time.time()
@@ -721,7 +734,8 @@ class ChatStream(ObjectProxy):
                 emit_event(_parse_choice_event(choice))
         else:
             if should_send_prompts():
-                _set_completions(self._span, self._complete_response.get("choices"))
+                _set_completions(
+                    self._span, self._complete_response.get("choices"))
 
         self._span.set_status(Status(StatusCode.OK))
         self._span.end()
@@ -755,7 +769,8 @@ def _build_from_streaming_response(
 
         if first_token and streaming_time_to_first_token:
             time_of_first_token = time.time()
-            streaming_time_to_first_token.record(time_of_first_token - start_time)
+            streaming_time_to_first_token.record(
+                time_of_first_token - start_time)
             first_token = False
 
         _accumulate_stream_items(item, complete_response)
@@ -825,7 +840,8 @@ async def _abuild_from_streaming_response(
 
         if first_token and streaming_time_to_first_token:
             time_of_first_token = time.time()
-            streaming_time_to_first_token.record(time_of_first_token - start_time)
+            streaming_time_to_first_token.record(
+                time_of_first_token - start_time)
             first_token = False
 
         _accumulate_stream_items(item, complete_response)
@@ -943,7 +959,8 @@ def _(choice: dict) -> ChoiceEvent:
 
     content = choice.get("message").get("content", "") if has_message else None
     role = choice.get("message").get("role") if has_message else "unknown"
-    finish_reason = choice.get("finish_reason") if has_finish_reason else "unknown"
+    finish_reason = choice.get(
+        "finish_reason") if has_finish_reason else "unknown"
 
     if has_tool_calls and has_function_call:
         tool_calls = message.get("tool_calls") + [message.get("function_call")]
@@ -982,7 +999,8 @@ def _accumulate_stream_items(item, complete_response):
 
     # prompt filter results
     if item.get("prompt_filter_results"):
-        complete_response["prompt_filter_results"] = item.get("prompt_filter_results")
+        complete_response["prompt_filter_results"] = item.get(
+            "prompt_filter_results")
 
     for choice in item.get("choices"):
         index = choice.get("index")
@@ -1029,4 +1047,5 @@ def _accumulate_stream_items(item, complete_response):
                 if tool_call_function and tool_call_function.get("name"):
                     span_function["name"] = tool_call_function.get("name")
                 if tool_call_function and tool_call_function.get("arguments"):
-                    span_function["arguments"] += tool_call_function.get("arguments")
+                    span_function["arguments"] += tool_call_function.get(
+                        "arguments")

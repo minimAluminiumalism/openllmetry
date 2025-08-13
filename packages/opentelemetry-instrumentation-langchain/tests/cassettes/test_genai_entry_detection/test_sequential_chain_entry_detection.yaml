@@ -1,0 +1,145 @@
+interactions:
+- request:
+    body: '{"model": "gpt-3.5-turbo-instruct", "prompt": ["You are a playwright. Write
+      a synopsis for this title.\n    Title: The Testing Chronicles\n    Era: Modern
+      Era\n    Synopsis:"], "frequency_penalty": 0, "logprobs": null, "max_tokens":
+      256, "n": 1, "presence_penalty": 0, "seed": null, "temperature": 0.7, "top_p":
+      1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '314'
+      content-type:
+      - application/json
+      host:
+      - localhost:5002
+      traceparent:
+      - 00-fcfe3f59bd89f8f320955c17363a700d-440ced2547c8ff55-01
+      user-agent:
+      - OpenAI/Python 1.59.9
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.59.9
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.1
+    method: POST
+    uri: http://localhost:5002/v1/completions
+  response:
+    body:
+      string: "{\"id\":\"cmpl-2nYZXNHxx1PeK1u8xXcE1Fqr1U6Ve\",\"object\":\"text_completion\",\"created\":1753803602,\"model\":\"gpt-3.5-turbo-instruct\",\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":50,\"total_tokens\":60},\"choices\":[{\"text\":\"In
+        the observability department, Prometheus, Grafana, Jaeger, and Loki were stressed.
+        Prometheus groaned, \\\"12-hour backfills\u20148 a.m., 8 p.m.\u2014just to
+        keep up.\\\" Grafana flipped her hair, \\\"47 dashboards, all screaming 'CRITICAL'\u2014users
+        want real-time, not 'click here for yesterday's query.'\\\" Jaeger crossed
+        arms, \\\"Agents breaking daily. A dev traced a Python function, sent telemetry
+        to my email. Spent hours deleting 200 emails!\\\" Loki smirked, \\\"And logs?
+        A mountain. We argue Jaeger vs. Zipkin vs. Tempo\u2014we forgot the goal:
+        understanding what\u2019s really happening*.\\\"\\n\\n\",\"finish_reason\":\"stop\",\"logprobs\":null,\"index\":0}]}"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '850'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 29 Jul 2025 15:40:02 GMT
+      ETag:
+      - W/"352-Kulp2nrO6k8xnoC9x/KzQmvLm7k"
+      Keep-Alive:
+      - timeout=5
+      X-Powered-By:
+      - Express
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"model": "gpt-3.5-turbo-instruct", "prompt": ["Write a review for this
+      play.\n    Synopsis: In the observability department, Prometheus, Grafana, Jaeger,
+      and Loki were stressed. Prometheus groaned, \"12-hour backfills\u20148 a.m.,
+      8 p.m.\u2014just to keep up.\" Grafana flipped her hair, \"47 dashboards, all
+      screaming ''CRITICAL''\u2014users want real-time, not ''click here for yesterday''s
+      query.''\" Jaeger crossed arms, \"Agents breaking daily. A dev traced a Python
+      function, sent telemetry to my email. Spent hours deleting 200 emails!\" Loki
+      smirked, \"And logs? A mountain. We argue Jaeger vs. Zipkin vs. Tempo\u2014we
+      forgot the goal: understanding what\u2019s really happening*.\"\n\n\n    Review:"],
+      "frequency_penalty": 0, "logprobs": null, "max_tokens": 256, "n": 1, "presence_penalty":
+      0, "seed": null, "temperature": 0.7, "top_p": 1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '845'
+      content-type:
+      - application/json
+      host:
+      - localhost:5002
+      traceparent:
+      - 00-fcfe3f59bd89f8f320955c17363a700d-8fa4bb97a02101c5-01
+      user-agent:
+      - OpenAI/Python 1.59.9
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.59.9
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.1
+    method: POST
+    uri: http://localhost:5002/v1/completions
+  response:
+    body:
+      string: "{\"id\":\"cmpl-2nYZXNHxx1PeK1u8xXcE1Fqr1U6Ve\",\"object\":\"text_completion\",\"created\":1753803602,\"model\":\"gpt-3.5-turbo-instruct\",\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":50,\"total_tokens\":60},\"choices\":[{\"text\":\"Why
+        did Prometheus, Grafana, and Jaeger start a support group? Because they were
+        all feeling over-telemetry'd\u2014too many tools, not enough unity. Then OpenTelemetry
+        walked in, smiled, and said, \u201CRelax, you\u2019re all just metrics apart.\u201D
+        They laughed. Now they share traces, logs, and metrics seamlessly\u2014because
+        who needs chaos when you\u2019ve got a unified observability suite?\\n\\n\",\"finish_reason\":\"stop\",\"logprobs\":null,\"index\":0}]}"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '651'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 29 Jul 2025 15:40:02 GMT
+      ETag:
+      - W/"28b-raC/tOmR05s5JpjAKSfvM1Bhv0g"
+      Keep-Alive:
+      - timeout=5
+      X-Powered-By:
+      - Express
+    status:
+      code: 200
+      message: OK
+version: 1

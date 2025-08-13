@@ -28,6 +28,9 @@ from opentelemetry.instrumentation.openai.utils import (
     should_emit_events,
     should_send_prompts,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    with_genai_entry_detection,
+)
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.semconv_ai import (
     SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY,
@@ -44,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def completion_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY) or context_api.get_value(
         SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY
@@ -79,6 +83,7 @@ def completion_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 async def acompletion_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY) or context_api.get_value(
         SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY
@@ -242,7 +247,8 @@ def _set_token_usage(span, request_kwargs, complete_response):
             model_name = complete_response.get("model") or None
 
             if model_name:
-                prompt_usage = get_token_count_from_string(prompt_content, model_name)
+                prompt_usage = get_token_count_from_string(
+                    prompt_content, model_name)
 
         # completion_usage
         if complete_response.get("choices"):

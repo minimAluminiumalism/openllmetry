@@ -1,0 +1,41 @@
+interactions:
+- request:
+    body: '{"model": "gemma3:1b", "stream": true, "messages": [{"role": "user", "content":
+      "Say hello in one word"}], "tools": []}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '119'
+      content-type:
+      - application/json
+      host:
+      - 127.0.0.1:11434
+      user-agent:
+      - ollama-python/0.4.7 (arm64 darwin) Python/3.12.1
+    method: POST
+    uri: http://127.0.0.1:11434/api/chat
+  response:
+    body:
+      string: '{"model":"gemma3:1b","created_at":"2025-07-29T09:40:59.358532Z","message":{"role":"assistant","content":"Hello"},"done":false}
+
+        {"model":"gemma3:1b","created_at":"2025-07-29T09:40:59.368763Z","message":{"role":"assistant","content":"!"},"done":false}
+
+        {"model":"gemma3:1b","created_at":"2025-07-29T09:40:59.379955Z","message":{"role":"assistant","content":""},"done_reason":"stop","done":true,"total_duration":260668042,"load_duration":75622375,"prompt_eval_count":14,"prompt_eval_duration":160035834,"eval_count":3,"eval_duration":24478541}
+
+        '
+    headers:
+      Content-Type:
+      - application/x-ndjson
+      Date:
+      - Tue, 29 Jul 2025 09:40:59 GMT
+      Transfer-Encoding:
+      - chunked
+    status:
+      code: 200
+      message: OK
+version: 1

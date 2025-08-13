@@ -2,7 +2,6 @@ import json
 import time
 from typing import Any, Dict, List, Optional, Type, Union
 from uuid import UUID
-
 from langchain_core.callbacks import (
     BaseCallbackHandler,
 )
@@ -61,6 +60,10 @@ from opentelemetry.semconv_ai import (
     SpanAttributes,
     TraceloopSpanKindValues,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    is_genai_entry_enabled,
+    GENAI_ENTRY_ATTRIBUTE,
+)
 from opentelemetry.trace import SpanKind, Tracer, set_span_in_context
 from opentelemetry.trace.span import Span
 from opentelemetry.trace.status import Status, StatusCode
@@ -69,10 +72,8 @@ from opentelemetry.trace.status import Status, StatusCode
 def _extract_class_name_from_serialized(serialized: Optional[dict[str, Any]]) -> str:
     """
     Extract class name from serialized model information.
-
     Args:
         serialized: Serialized model information from LangChain callback
-
     Returns:
         Class name string, or empty string if not found
     """
@@ -98,7 +99,7 @@ def _message_type_to_role(message_type: str) -> str:
         return "unknown"
 
 
-def _sanitize_metadata_value(value: Any) -> Any:
+def _sanitize_metadata_value(value: Any) -> str:
     """Convert metadata values to OpenTelemetry-compatible types."""
     if value is None:
         return None
@@ -132,12 +133,9 @@ def _extract_tool_call_data(
 ) -> Union[List[ToolCall], None]:
     if tool_calls is None:
         return tool_calls
-
     response = []
-
     for tool_call in tool_calls:
         tool_call_function = {"name": tool_call.get("name", "")}
-
         if tool_call.get("arguments"):
             tool_call_function["arguments"] = tool_call["arguments"]
         elif tool_call.get("args"):
@@ -149,7 +147,6 @@ def _extract_tool_call_data(
                 type="function",
             )
         )
-
     return response
 
 
@@ -186,6 +183,20 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
     def _get_span(self, run_id: UUID) -> Span:
         return self.spans[run_id].span
 
+    # for entry span detection and marking
+    def _should_mark_as_genai_entry(self, parent_run_id: Optional[UUID]) -> bool:
+        """
+        Check if the span should be marked as GenAI entry based on parent relationship.
+        Args:
+            parent_run_id: The parent run ID from LangChain callback
+        Returns:
+            bool: True if this should be marked as GenAI entry span
+        """
+        if not is_genai_entry_enabled():
+            return False
+        # Mark as entry if it's the top-level call (no parent or parent not tracked)
+        return parent_run_id is None or parent_run_id not in self.spans
+
     def _end_span(self, span: Span, run_id: UUID) -> None:
         for child_id in self.spans[run_id].children:
             child_span = self.spans[child_id].span
@@ -220,7 +231,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                     {**current_association_properties, **sanitized_metadata},
                 )
             )
-
         if parent_run_id is not None and parent_run_id in self.spans:
             span = self.tracer.start_span(
                 span_name,
@@ -229,21 +239,16 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             )
         else:
             span = self.tracer.start_span(span_name, kind=kind)
-
         _set_span_attribute(span, SpanAttributes.TRACELOOP_WORKFLOW_NAME, workflow_name)
         _set_span_attribute(span, SpanAttributes.TRACELOOP_ENTITY_PATH, entity_path)
-
         token = context_api.attach(
             context_api.set_value(SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY, True)
         )
-
         self.spans[run_id] = SpanHolder(
             span, token, None, [], workflow_name, entity_name, entity_path
         )
-
         if parent_run_id is not None and parent_run_id in self.spans:
             self.spans[parent_run_id].children.append(run_id)
-
         return span
 
     def _create_task_span(
@@ -267,10 +272,8 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             entity_path=entity_path,
             metadata=metadata,
         )
-
         _set_span_attribute(span, SpanAttributes.TRACELOOP_SPAN_KIND, kind.value)
         _set_span_attribute(span, SpanAttributes.TRACELOOP_ENTITY_NAME, entity_name)
-
         return span
 
     def _create_llm_span(
@@ -284,7 +287,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
     ) -> Span:
         workflow_name = self.get_workflow_name(parent_run_id)
         entity_path = self.get_entity_path(parent_run_id)
-
         span = self._create_span(
             run_id,
             parent_run_id,
@@ -294,12 +296,9 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             entity_path=entity_path,
             metadata=metadata,
         )
-
         vendor = detect_vendor_from_class(_extract_class_name_from_serialized(serialized))
-
         _set_span_attribute(span, SpanAttributes.LLM_SYSTEM, vendor)
         _set_span_attribute(span, SpanAttributes.LLM_REQUEST_TYPE, request_type.value)
-
         return span
 
     @dont_throw
@@ -317,23 +316,19 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Run when chain starts running."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         workflow_name = ""
         entity_path = ""
-
         name = self._get_name_from_callback(serialized, **kwargs)
         kind = (
             TraceloopSpanKindValues.WORKFLOW
             if parent_run_id is None or parent_run_id not in self.spans
             else TraceloopSpanKindValues.TASK
         )
-
         if kind == TraceloopSpanKindValues.WORKFLOW:
             workflow_name = name
         else:
             workflow_name = self.get_workflow_name(parent_run_id)
             entity_path = self.get_entity_path(parent_run_id)
-
         span = self._create_task_span(
             run_id,
             parent_run_id,
@@ -344,6 +339,9 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             entity_path,
             metadata,
         )
+        # Mark as GenAI entry if this is a top-level operation
+        if self._should_mark_as_genai_entry(parent_run_id):
+            span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
         if not should_emit_events() and should_send_prompts():
             span.set_attribute(
                 SpanAttributes.TRACELOOP_ENTITY_INPUT,
@@ -357,7 +355,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                     cls=CallbackFilteredJSONEncoder,
                 ),
             )
-
         # The start_time is now automatically set when creating the SpanHolder
 
     @dont_throw
@@ -372,7 +369,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Run when chain ends running."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         span_holder = self.spans[run_id]
         span = span_holder.span
         if not should_emit_events() and should_send_prompts():
@@ -383,7 +379,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                     cls=CallbackFilteredJSONEncoder,
                 ),
             )
-
         self._end_span(span, run_id)
         if parent_run_id is None:
             context_api.attach(
@@ -407,11 +402,13 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Run when Chat Model starts running."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         name = self._get_name_from_callback(serialized, kwargs=kwargs)
         span = self._create_llm_span(
             run_id, parent_run_id, name, LLMRequestTypeValues.CHAT, metadata=metadata, serialized=serialized
         )
+        # Mark as GenAI entry if this is a top-level operation
+        if self._should_mark_as_genai_entry(parent_run_id):
+            span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
         set_request_params(span, kwargs, self.spans[run_id])
         if should_emit_events():
             self._emit_chat_input_events(messages)
@@ -433,11 +430,13 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Run when Chat Model starts running."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         name = self._get_name_from_callback(serialized, kwargs=kwargs)
         span = self._create_llm_span(
             run_id, parent_run_id, name, LLMRequestTypeValues.COMPLETION, serialized=serialized
         )
+        # Mark as GenAI entry if this is a top-level operation
+        if self._should_mark_as_genai_entry(parent_run_id):
+            span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
         set_request_params(span, kwargs, self.spans[run_id])
         if should_emit_events():
             for prompt in prompts:
@@ -455,9 +454,7 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
     ):
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         span = self._get_span(run_id)
-
         model_name = None
         if response.llm_output is not None:
             model_name = response.llm_output.get(
@@ -465,7 +462,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             ) or response.llm_output.get("model_id")
             if model_name is not None:
                 _set_span_attribute(span, SpanAttributes.LLM_RESPONSE_MODEL, model_name)
-
                 if self.spans[run_id].request_model is None:
                     _set_span_attribute(
                         span, SpanAttributes.LLM_REQUEST_MODEL, model_name
@@ -492,7 +488,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             total_tokens = token_usage.get("total_tokens") or (
                 prompt_tokens + completion_tokens
             )
-
             _set_span_attribute(
                 span, SpanAttributes.LLM_USAGE_PROMPT_TOKENS, prompt_tokens
             )
@@ -502,7 +497,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             _set_span_attribute(
                 span, SpanAttributes.LLM_USAGE_TOTAL_TOKENS, total_tokens
             )
-
             # Record token usage metrics
             vendor = span.attributes.get(SpanAttributes.LLM_SYSTEM, "Langchain")
             if prompt_tokens > 0:
@@ -514,7 +508,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                         SpanAttributes.LLM_RESPONSE_MODEL: model_name or "unknown",
                     },
                 )
-
             if completion_tokens > 0:
                 self.token_histogram.record(
                     completion_tokens,
@@ -530,7 +523,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         else:
             set_chat_response(span, response)
         self._end_span(span, run_id)
-
         # Record duration
         duration = time.time() - self.spans[run_id].start_time
         vendor = span.attributes.get(SpanAttributes.LLM_SYSTEM, "Langchain")
@@ -558,11 +550,9 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Run when tool starts running."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         name = self._get_name_from_callback(serialized, kwargs=kwargs)
         workflow_name = self.get_workflow_name(parent_run_id)
         entity_path = self.get_entity_path(parent_run_id)
-
         span = self._create_task_span(
             run_id,
             parent_run_id,
@@ -599,7 +589,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Run when tool ends running."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         span = self._get_span(run_id)
         if not should_emit_events() and should_send_prompts():
             span.set_attribute(
@@ -618,15 +607,12 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
 
     def get_workflow_name(self, parent_run_id: str):
         parent_span = self.get_parent_span(parent_run_id)
-
         if parent_span is None:
             return ""
-
         return parent_span.workflow_name
 
     def get_entity_path(self, parent_run_id: str):
         parent_span = self.get_parent_span(parent_run_id)
-
         if parent_span is None:
             return ""
         elif (
@@ -649,7 +635,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         """Common error handling logic for all components."""
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-
         span = self._get_span(run_id)
         span.set_status(Status(StatusCode.ERROR))
         span.record_exception(error)
@@ -750,7 +735,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 )
             else:
                 finish_reason = "unknown"
-
             # Get tool calls
             if (
                 hasattr(generation.message, "tool_calls")
@@ -765,7 +749,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 )
             else:
                 tool_calls = None
-
             # Emit the event
             if hasattr(generation, "text") and generation.text != "":
                 emit_event(
@@ -796,7 +779,6 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 )
             else:
                 finish_reason = "unknown"
-
             # Emit the event
             emit_event(
                 ChoiceEvent(

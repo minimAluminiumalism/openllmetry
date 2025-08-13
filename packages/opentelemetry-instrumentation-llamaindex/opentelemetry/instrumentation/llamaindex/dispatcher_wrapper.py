@@ -1,5 +1,6 @@
 import inspect
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from functools import singledispatchmethod
@@ -54,6 +55,33 @@ from opentelemetry.semconv_ai import (
     TraceloopSpanKindValues,
 )
 from opentelemetry.trace import Span, Tracer, set_span_in_context
+
+# Import GenAI entry detection utilities
+try:
+    from opentelemetry.semconv_ai.genai_entry import (
+        GENAI_ENTRY_ATTRIBUTE,
+        is_genai_entry_enabled,
+        mark_span_as_genai_entry,
+    )
+except ImportError:
+    # Fallback implementation for compatibility
+    GENAI_ENTRY_ATTRIBUTE = "gen_ai.is_entry"
+    GENAI_ENTRY_ENV_VAR = "OTEL_MARK_GENAI_ENTRY"
+
+    def is_genai_entry_enabled() -> bool:
+        """Check if GenAI entry marking is enabled via environment variable."""
+        try:
+            return os.getenv(GENAI_ENTRY_ENV_VAR, "true").lower() == "true"
+        except Exception:
+            return False  # Fail-safe default
+
+    def mark_span_as_genai_entry(span):
+        """Fallback implementation for marking spans."""
+        try:
+            if span and span.is_recording() and is_genai_entry_enabled():
+                span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
+        except Exception:
+            pass  # Fail-safe
 
 # For these spans, instead of creating a span using data from LlamaIndex,
 # we use the regular OpenLLMetry instrumentations
@@ -217,6 +245,12 @@ class OpenLLMetrySpanHandler(BaseSpanHandler[SpanHolder]):
 
         span.set_attribute(SpanAttributes.TRACELOOP_SPAN_KIND, kind)
         span.set_attribute(SpanAttributes.TRACELOOP_ENTITY_NAME, span_name)
+
+        # Mark as genai entry only for workflow spans (top-level LlamaIndex operations)
+        # Task spans are internal operations and should not be considered as entry points
+        if kind == TraceloopSpanKindValues.WORKFLOW.value:
+            mark_span_as_genai_entry(span)
+
         try:
             if should_send_prompts():
                 span.set_attribute(

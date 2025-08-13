@@ -17,6 +17,10 @@ from opentelemetry.instrumentation.openai.utils import (
     dont_throw,
     should_emit_events,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    with_genai_entry_detection,
+)
+
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.semconv_ai import LLMRequestTypeValues, SpanAttributes
@@ -32,6 +36,7 @@ runs = {}
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def assistants_create_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -47,6 +52,7 @@ def assistants_create_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def runs_create_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -75,6 +81,7 @@ def runs_create_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def runs_retrieve_wrapper(tracer, wrapped, instance, args, kwargs):
     @dont_throw
     def process_response(response):
@@ -106,6 +113,7 @@ def runs_retrieve_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def messages_list_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -238,6 +246,7 @@ def messages_list_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def runs_create_and_stream_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)

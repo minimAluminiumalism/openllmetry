@@ -7,14 +7,10 @@ exclude_lines = ['if TYPE_CHECKING:']
 show_missing = true
 
 [tool.poetry]
-name = "opentelemetry-instrumentation-langchain"
-version = "0.43.1"
+name = "tapm-instrumentation-langchain"
+version = "0.43.1a2"
 description = "OpenTelemetry Langchain instrumentation"
-authors = [
-  "Gal Kleinman <gal@traceloop.com>",
-  "Nir Gazit <nir@traceloop.com>",
-  "Tomer Friedman <tomer@traceloop.com>",
-]
+authors = ["Wilson Cai <wilsonxscai@tencent.com>"]
 repository = "https://github.com/traceloop/openllmetry/tree/main/packages/opentelemetry-instrumentation-langchain"
 license = "Apache-2.0"
 readme = "README.md"
@@ -27,7 +23,7 @@ python = ">=3.9,<4"
 opentelemetry-api = "^1.28.0"
 opentelemetry-instrumentation = ">=0.50b0"
 opentelemetry-semantic-conventions = ">=0.50b0"
-opentelemetry-semantic-conventions-ai = "0.4.11"
+tapm-semantic-conventions-ai = "0.4.11a1"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.3.1"
@@ -46,7 +42,7 @@ vcrpy = "^6.0.2"
 pytest-recording = "^0.13.2"
 pytest-asyncio = "^0.24.0"
 opentelemetry-sdk = "^1.27.0"
-opentelemetry-instrumentation-openai = { path = "../opentelemetry-instrumentation-openai", develop = true }
+tapm-instrumentation-openai = { path = "../opentelemetry-instrumentation-openai" }
 opentelemetry-instrumentation-bedrock = { path = "../opentelemetry-instrumentation-bedrock", develop = true }
 text-generation = "^0.7.0"
 anthropic = "^0.51.0"

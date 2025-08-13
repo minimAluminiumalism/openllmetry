@@ -29,6 +29,9 @@ from opentelemetry.instrumentation.openai.utils import (
     should_send_prompts,
     start_as_current_span_async,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    with_genai_entry_detection,
+)
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.metrics import Counter, Histogram
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
@@ -49,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 @_with_embeddings_telemetry_wrapper
+@with_genai_entry_detection
 def embeddings_wrapper(
     tracer,
     token_counter: Counter,
@@ -113,6 +117,7 @@ def embeddings_wrapper(
 
 
 @_with_embeddings_telemetry_wrapper
+@with_genai_entry_detection
 async def aembeddings_wrapper(
     tracer,
     token_counter: Counter,
@@ -250,7 +255,8 @@ def _set_embeddings_metrics(
                     **shared_attributes,
                     SpanAttributes.LLM_TOKEN_TYPE: _token_type(name),
                 }
-                token_counter.record(val, attributes=attributes_with_token_type)
+                token_counter.record(
+                    val, attributes=attributes_with_token_type)
 
     # vec size metrics
     # should use counter for vector_size?
@@ -270,7 +276,8 @@ def _set_prompts(span, prompt):
 
     if isinstance(prompt, list):
         for i, p in enumerate(prompt):
-            _set_span_attribute(span, f"{SpanAttributes.LLM_PROMPTS}.{i}.content", p)
+            _set_span_attribute(
+                span, f"{SpanAttributes.LLM_PROMPTS}.{i}.content", p)
     else:
         _set_span_attribute(
             span,
@@ -293,7 +300,8 @@ def _emit_embeddings_choice_event(response) -> None:
             emit_event(
                 ChoiceEvent(
                     index=embedding.index,
-                    message={"content": embedding.embedding, "role": "assistant"},
+                    message={"content": embedding.embedding,
+                             "role": "assistant"},
                 )
             )
 
@@ -303,6 +311,7 @@ def _emit_embeddings_choice_event(response) -> None:
             emit_event(
                 ChoiceEvent(
                     index=embedding.index,
-                    message={"content": embedding.embedding, "role": "assistant"},
+                    message={"content": embedding.embedding,
+                             "role": "assistant"},
                 )
             )

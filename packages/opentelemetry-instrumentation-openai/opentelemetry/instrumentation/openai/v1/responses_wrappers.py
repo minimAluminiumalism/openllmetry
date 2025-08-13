@@ -64,6 +64,10 @@ from opentelemetry.instrumentation.openai.utils import (
     dont_throw,
     should_send_prompts,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    with_genai_entry_detection,
+)
+
 
 SPAN_NAME = "openai.response"
 
@@ -382,6 +386,7 @@ def set_data_attributes(traced_response: TracedData, span: Span):
 
 @dont_throw
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def responses_get_or_create_wrapper(tracer: Tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -478,6 +483,7 @@ def responses_get_or_create_wrapper(tracer: Tracer, wrapped, instance, args, kwa
 
 @dont_throw
 @_with_tracer_wrapper
+@with_genai_entry_detection
 async def async_responses_get_or_create_wrapper(
     tracer: Tracer, wrapped, instance, args, kwargs
 ):
@@ -572,6 +578,7 @@ async def async_responses_get_or_create_wrapper(
 
 @dont_throw
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def responses_cancel_wrapper(tracer: Tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -596,6 +603,7 @@ def responses_cancel_wrapper(tracer: Tracer, wrapped, instance, args, kwargs):
 
 @dont_throw
 @_with_tracer_wrapper
+@with_genai_entry_detection
 async def async_responses_cancel_wrapper(
     tracer: Tracer, wrapped, instance, args, kwargs
 ):

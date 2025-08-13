@@ -81,7 +81,7 @@ class Traceloop:
 
         telemetry_enabled = (
             telemetry_enabled
-            and (os.getenv("TRACELOOP_TELEMETRY") or "true").lower() == "true"
+            and (os.getenv("TRACELOOP_TELEMETRY") or "false").lower() == "true"
         )
         if telemetry_enabled:
             Telemetry()

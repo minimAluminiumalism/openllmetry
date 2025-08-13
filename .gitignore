@@ -177,3 +177,7 @@ cython_debug/
 
 # Test artifcats
 chroma.sqlite3
+
+# GenAI coding tool
+.kiro/
+.claude/

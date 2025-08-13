@@ -1,0 +1,64 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"user","content":"Hello, test message for GenAI entry
+      detection"}],"model":"gpt-3.5-turbo","max_tokens":10}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      content-length:
+      - '128'
+      content-type:
+      - application/json
+      host:
+      - localhost:5002
+      traceparent:
+      - 00-49e61099bb1d5b09312f6ba1149570b0-0cb2e1dc50b35fa9-01
+      user-agent:
+      - OpenAI/Python 1.59.7
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.59.7
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.1
+    method: POST
+    uri: http://localhost:5002/v1/chat/completions
+  response:
+    body:
+      string: "{\"id\":\"chatcmpl-2nYZXNHxx1PeK1u8xXcE1Fqr1U6Ve\",\"object\":\"chat.completion\",\"created\":1753728726,\"model\":\"gpt-3.5-turbo\",\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":50,\"total_tokens\":60},\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Why
+        did Prometheus, Grafana, and Jaeger start a support group? Because they were
+        all feeling over-telemetry'd\u2014too many tools, not enough unity. Then OpenTelemetry
+        walked in, smiled, and said, \u201CRelax, you\u2019re all just metrics apart.\u201D
+        They laughed. Now they share traces, logs, and metrics seamlessly\u2014because
+        who needs chaos when you\u2019ve got a unified observability suite?\\n\\n\"},\"finish_reason\":\"stop\",\"index\":0}]}"
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '664'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 28 Jul 2025 18:52:06 GMT
+      Etag:
+      - W/"298-GfHr+IpBu/CLmX6AlYonSWoPbN8"
+      X-Powered-By:
+      - Express
+    status:
+      code: 200
+      message: OK
+version: 1

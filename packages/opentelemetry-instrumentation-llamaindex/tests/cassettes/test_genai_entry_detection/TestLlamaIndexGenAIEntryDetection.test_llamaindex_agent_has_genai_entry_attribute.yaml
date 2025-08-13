@@ -1,0 +1,223 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"You are designed to help with
+      a variety of tasks, from answering questions to providing summaries to other
+      types of analyses.\n\n## Tools\n\nYou have access to a wide variety of tools.
+      You are responsible for using the tools in any sequence you deem appropriate
+      to complete the task at hand.\nThis may require breaking the task into subtasks
+      and using different tools to complete each subtask.\n\nYou have access to the
+      following tools:\n> Tool Name: multiply\nTool Description: multiply(a: int,
+      b: int) -> int\nMultiply two integers and return the result.\nTool Args: {\"properties\":
+      {\"a\": {\"title\": \"A\", \"type\": \"integer\"}, \"b\": {\"title\": \"B\",
+      \"type\": \"integer\"}}, \"required\": [\"a\", \"b\"], \"type\": \"object\"}\n\n\n\n##
+      Output Format\n\nPlease answer in the same language as the question and use
+      the following format:\n\n```\nThought: The current language of the user is:
+      (user''s language). I need to use a tool to help me answer the question.\nAction:
+      tool name (one of multiply) if using a tool.\nAction Input: the input to the
+      tool, in a JSON format representing the kwargs (e.g. {\"input\": \"hello world\",
+      \"num_beams\": 5})\n```\n\nPlease ALWAYS start with a Thought.\n\nNEVER surround
+      your response with markdown code markers. You may use code markers within your
+      response if you need to.\n\nPlease use a valid JSON format for the Action Input.
+      Do NOT do this {''input'': ''hello world'', ''num_beams'': 5}. If you include
+      the \"Action:\" line, then you MUST include the \"Action Input:\" line too,
+      even if the tool does not need kwargs, in that case you MUST use \"Action Input:
+      {}\".\n\nIf this format is used, the tool will respond in the following format:\n\n```\nObservation:
+      tool response\n```\n\nYou should keep repeating the above format till you have
+      enough information to answer the question without using any more tools. At that
+      point, you MUST respond in one of the following two formats:\n\n```\nThought:
+      I can answer without using any more tools. I''ll use the user''s language to
+      answer\nAnswer: [your answer here (In the same language as the user''s question)]\n```\n\n```\nThought:
+      I cannot answer the question with the provided tools.\nAnswer: [your answer
+      here (In the same language as the user''s question)]\n```\n\n## Current Conversation\n\nBelow
+      is the current conversation consisting of interleaving human and assistant messages.\n"},{"role":"user","content":"What
+      is 3 multiplied by 4?"}],"model":"qwen-turbo","stream":false,"temperature":0.1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '2537'
+      content-type:
+      - application/json
+      host:
+      - dashscope.aliyuncs.com
+      traceparent:
+      - 00-cf29cf006635d9bc91b922fffeddfa79-6f19d5bf62dadd0d-01
+      user-agent:
+      - OpenAI/Python 1.98.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.98.0
+      x-stainless-read-timeout:
+      - '60.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.1
+    method: POST
+    uri: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1RRTW/bMAz9KwTPcuA6DtzotsMOvfe2DIEsMbY2WVQlCl0R+L8PGpYOu/HjkY/v
+        8Y52ZW+poP52x41KMQuhvmPmQKjRlOKLmCio0HIUioIaX1euyyoaXlcCW3OmKBBMXKpZCPgGshLU
+        Qhl80fA1LsGX9QAvEIkcCLceGBDm0LKVQoKNwMTyTvnP8FulIp7j4RK/2BZo2GoQn8LHowIvMVXR
+        cL+guaCGo4ILzi0ad9wV3nz0Zb1mMoUjaizCCRX66OgX6l5h4CVlngvqWEPYvyvk+QfZJtCuRg6W
+        txSoUaHC+jAmZd6SXIV/UiyoT+Nzc+aB/KyPo0JhMeEf8jyo/6evjsT4UNpaa+xK7hPc77tCm8kI
+        OdRP02kczuehcZWPIrRdbz4ulFP27SHtfoUbOwqo8e2dYic1z9zkur9y7JZC9zQcB9O7oRun3nTn
+        05k64/q5m27TcHru3UTzEfffAAAA//8DAIfu8pQVAgAA
+    headers:
+      content-encoding:
+      - gzip
+      content-type:
+      - application/json
+      date:
+      - Mon, 04 Aug 2025 09:20:48 GMT
+      req-arrive-time:
+      - '1754299247503'
+      req-cost-time:
+      - '875'
+      resp-start-time:
+      - '1754299248379'
+      server:
+      - istio-envoy
+      set-cookie:
+      - acw_tc=1232a0d2-470a-959e-ad0b-7f72580d7eb3a001237f146a42bd47ed52b24d4e33ad;path=/;HttpOnly;Max-Age=1800
+      transfer-encoding:
+      - chunked
+      vary:
+      - Origin,Access-Control-Request-Method,Access-Control-Request-Headers, Accept-Encoding
+      x-dashscope-call-gateway:
+      - 'true'
+      x-envoy-upstream-service-time:
+      - '874'
+      x-request-id:
+      - 1232a0d2-470a-959e-ad0b-7f72580d7eb3
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"You are designed to help with
+      a variety of tasks, from answering questions to providing summaries to other
+      types of analyses.\n\n## Tools\n\nYou have access to a wide variety of tools.
+      You are responsible for using the tools in any sequence you deem appropriate
+      to complete the task at hand.\nThis may require breaking the task into subtasks
+      and using different tools to complete each subtask.\n\nYou have access to the
+      following tools:\n> Tool Name: multiply\nTool Description: multiply(a: int,
+      b: int) -> int\nMultiply two integers and return the result.\nTool Args: {\"properties\":
+      {\"a\": {\"title\": \"A\", \"type\": \"integer\"}, \"b\": {\"title\": \"B\",
+      \"type\": \"integer\"}}, \"required\": [\"a\", \"b\"], \"type\": \"object\"}\n\n\n\n##
+      Output Format\n\nPlease answer in the same language as the question and use
+      the following format:\n\n```\nThought: The current language of the user is:
+      (user''s language). I need to use a tool to help me answer the question.\nAction:
+      tool name (one of multiply) if using a tool.\nAction Input: the input to the
+      tool, in a JSON format representing the kwargs (e.g. {\"input\": \"hello world\",
+      \"num_beams\": 5})\n```\n\nPlease ALWAYS start with a Thought.\n\nNEVER surround
+      your response with markdown code markers. You may use code markers within your
+      response if you need to.\n\nPlease use a valid JSON format for the Action Input.
+      Do NOT do this {''input'': ''hello world'', ''num_beams'': 5}. If you include
+      the \"Action:\" line, then you MUST include the \"Action Input:\" line too,
+      even if the tool does not need kwargs, in that case you MUST use \"Action Input:
+      {}\".\n\nIf this format is used, the tool will respond in the following format:\n\n```\nObservation:
+      tool response\n```\n\nYou should keep repeating the above format till you have
+      enough information to answer the question without using any more tools. At that
+      point, you MUST respond in one of the following two formats:\n\n```\nThought:
+      I can answer without using any more tools. I''ll use the user''s language to
+      answer\nAnswer: [your answer here (In the same language as the user''s question)]\n```\n\n```\nThought:
+      I cannot answer the question with the provided tools.\nAnswer: [your answer
+      here (In the same language as the user''s question)]\n```\n\n## Current Conversation\n\nBelow
+      is the current conversation consisting of interleaving human and assistant messages.\n"},{"role":"user","content":"What
+      is 3 multiplied by 4?"},{"role":"assistant","content":"Thought: The current
+      language of the user is: English. I need to use a tool to help me answer the
+      question.\nAction: multiply\nAction Input: {''a'': 3, ''b'': 4}"},{"role":"user","content":"Observation:
+      12"}],"model":"qwen-turbo","stream":false,"temperature":0.1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '2772'
+      content-type:
+      - application/json
+      cookie:
+      - acw_tc=1232a0d2-470a-959e-ad0b-7f72580d7eb3a001237f146a42bd47ed52b24d4e33ad
+      host:
+      - dashscope.aliyuncs.com
+      traceparent:
+      - 00-cf29cf006635d9bc91b922fffeddfa79-a3ab04a7d2dc84f1-01
+      user-agent:
+      - OpenAI/Python 1.98.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.98.0
+      x-stainless-read-timeout:
+      - '60.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.1
+    method: POST
+    uri: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SQu47cMAxFf4Vgs4088NjzVJdy+3RJMJBl2tZGFh2RwmQw8L8HDnY3SHUB4vCC
+        h0/0EwdPgvbbE2cScSOhfWLmSGjRiQRRlxQNek5KSdHi14nLOKmFV/AugUtypwz3oBMXhSIhjeDS
+        A2bOBMocZQevLzFCEQKdaMv8IhBdGosbN+a95Hv68jcttDCXqGGJgXroHnCAILBvdrgaHEIKMt0y
+        OeGEFkV5QYMh9fQbbW0w8rhk7gRtKjGuPwxy90Z+u91PTnee5yWSBk5osHw4L5nnRW/KPykJ2lN9
+        2aQ/yM95ezCorC7+Iw+N+X/71pO6EGWr9c5P1H/C9boa9JmcUo92fz4emuu1OdYG5SFK820IaaS8
+        5LD9ervf4Mw9RbT4606p0pI73nT7dx0/L7E6NfX1fGyPVd3tXXW9tEPlTgNV5/15uHg/DK1vcf0D
+        AAD//wMAPTNm0PABAAA=
+    headers:
+      content-encoding:
+      - gzip
+      content-type:
+      - application/json
+      date:
+      - Mon, 04 Aug 2025 09:20:49 GMT
+      req-arrive-time:
+      - '1754299249277'
+      req-cost-time:
+      - '726'
+      resp-start-time:
+      - '1754299250004'
+      server:
+      - istio-envoy
+      transfer-encoding:
+      - chunked
+      vary:
+      - Origin,Access-Control-Request-Method,Access-Control-Request-Headers, Accept-Encoding
+      x-dashscope-call-gateway:
+      - 'true'
+      x-envoy-upstream-service-time:
+      - '725'
+      x-request-id:
+      - 62097535-0b1a-983f-a6fe-717f8ccff3c3
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -34,6 +34,9 @@ from opentelemetry.semconv_ai import (
     Meters,
     SpanAttributes,
 )
+from opentelemetry.semconv_ai.genai_entry import (
+    with_genai_entry_detection,
+)
 from opentelemetry.trace import SpanKind, Tracer, get_tracer
 from opentelemetry.trace.status import Status, StatusCode
 from wrapt import wrap_function_wrapper
@@ -272,6 +275,7 @@ def _handle_response(span, event_logger, llm_request_type, token_histogram, resp
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 def _wrap(
     tracer: Tracer,
     token_histogram: Histogram,
@@ -339,6 +343,7 @@ def _wrap(
 
 
 @_with_tracer_wrapper
+@with_genai_entry_detection
 async def _awrap(
     tracer: Tracer,
     token_histogram: Histogram,

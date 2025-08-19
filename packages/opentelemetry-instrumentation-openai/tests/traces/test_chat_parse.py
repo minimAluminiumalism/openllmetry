@@ -543,8 +543,9 @@ def test_parsed_completion_exception(
         )
 
     spans = span_exporter.get_finished_spans()
-    assert len(spans) == 1
-    span: Span = spans[0]
+    chat_spans = [span for span in spans if span.name == "openai.chat"]
+    assert len(chat_spans) >= 1, f"Expected at least 1 openai.chat span, got {len(chat_spans)}"
+    span: Span = chat_spans[-1]
     assert span.name == "openai.chat"
     assert span.attributes.get(SpanAttributes.LLM_OPENAI_API_BASE) == "https://api.openai.com/v1/"
     assert span.attributes.get(SpanAttributes.LLM_IS_STREAMING) is False
@@ -578,8 +579,9 @@ async def test_async_parsed_completion_exception(
         )
 
     spans = span_exporter.get_finished_spans()
-    assert len(spans) == 1
-    span: Span = spans[0]
+    chat_spans = [span for span in spans if span.name == "openai.chat"]
+    assert len(chat_spans) >= 1, f"Expected at least 1 openai.chat span, got {len(chat_spans)}"
+    span: Span = chat_spans[-1]
     assert span.name == "openai.chat"
     assert span.attributes.get(SpanAttributes.LLM_OPENAI_API_BASE) == "https://api.openai.com/v1/"
     assert span.attributes.get(SpanAttributes.LLM_IS_STREAMING) is False

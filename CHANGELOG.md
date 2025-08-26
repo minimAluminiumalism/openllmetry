@@ -1,3 +1,147 @@
+## v0.46.1 (2025-08-24)
+
+### Fix
+
+- **google-generativeai,vertexai**: image support for Gemini models (#3340)
+
+## v0.46.0 (2025-08-24)
+
+### Feat
+
+- **openai**: add reasoning attributes (#3336)
+- **semantic-conventions-ai**: Add reasoning attributes (#3330)
+- **experiment**: Add run experiment capabilities (#3331)
+
+### Fix
+
+- **traceloop-sdk**: bump logging instrumentation to support newer otel versions (#3339)
+- **traceloop-sdk**: add @staticmethod decorator to set_association_properties (#3341)
+- **google-genai**: update logic for deciding whether to use awrap or wrap in the Google Generative AI Instrumentation (#3329)
+- **ollama**: missing response model attr in operation duration metric (#3328)
+- **bedrock**: add guardrail on span attributes (#3326)
+
+## v0.45.6 (2025-08-18)
+
+### Fix
+
+- **anthropic**: fix with_raw_response wrapper consistency and re-enable beta API instrumentation (#3297)
+- **langchain**: include content attribute when assistant messages have tool calls (#3287)
+- **google-genai**: migrate Google Generative AI instrumentation to googleapis/python-genai (#3282)
+
+## v0.45.5 (2025-08-15)
+
+### Fix
+
+- **openai-agents**: switch to hook-based instrumentation (#3283)
+
+## v0.45.4 (2025-08-14)
+
+### Fix
+
+- relax opentelemetry-semantic-conventions-ai deps (#3259)
+
+## v0.45.3 (2025-08-14)
+
+### Fix
+
+- **anthropic**: temp disable beta apis instrumentation (#3258)
+
+## v0.45.2 (2025-08-14)
+
+### Fix
+
+- **langchain**: langgraph application crash due to context detach (#3256)
+
+## v0.45.1 (2025-08-13)
+
+### Fix
+
+- **langchain**: context detach exception (#3255)
+- **mcp**: MCP Instrumentation: streamablehttp_client Parameter Corruption (#3199)
+
+## v0.45.0 (2025-08-12)
+
+### Feat
+
+- **datasets**: add dataset and datasets functionality (#3247)
+
+### Fix
+
+- **anthropic**: support with_raw_response wrapper for span generation (#3250)
+- **langchain**: fix nesting of langgraph spans (#3206)
+- **langchain**: Add "dont_throw" to "on_llm_end" and remove blank file (#3232)
+
+## v0.44.3 (2025-08-12)
+
+### Fix
+
+- **sdk**: avoid initializing metrics exporter on custom tracing config (#3249)
+- **openai**: propagate span IDs properly to events (#3243)
+
+## v0.44.2 (2025-08-11)
+
+### Fix
+
+- **openai**: dynamically import types for 1.99 (#3244)
+- **langchain**: Added new method for fetching model name from association metadata (#3237)
+
+## v0.44.1 (2025-08-04)
+
+### Fix
+
+- **mcp**: do not override meta pydantic types (#3179)
+
+## v0.44.0 (2025-08-03)
+
+### Feat
+
+- **sdk**: support multiple span processors (#3207)
+- **semantic-conentions-ai**: add LLMVendor enum to semantic conventions (#3170)
+
+### Fix
+
+- **langchain**: spans dictionary memory leak (#3216)
+- **openai-agents**: use framework's context to infer trace (#3215)
+- **sdk**: respect truncation otel environment variable (#3212)
+- **anthropic**: async stream manager (#3220)
+- **langchain**: populate metadata as span attributes in batch operations (#3218)
+- **anthropic**: various fixes around tools parsing (#3204)
+- **qdrant**: fix qdrant-client auto instrumentation condition (#3208)
+- **instrumentation**: remove param `enrich_token_usage` and simplify token calculation (#3205)
+- **langchain**: ensure llm spans are created for sync cases (#3201)
+- **openai**: support for openai non-consumed streams (#3155)
+
+## v0.43.1 (2025-07-23)
+
+### Fix
+
+- **langchain**: added vendors to llm calls (#3165)
+
+## v0.43.0 (2025-07-22)
+
+### Feat
+
+- **prompts**: add tool function support (#3153)
+
+### Fix
+
+- **llamaindex**: structured llm model and temperature parsing (#3159)
+- **langchain**: report token usage histogram (#3059)
+- **openai**: prioritize api-provided token over tiktoken calculation (#3142)
+- **milvus**: Add metrics support (#3013)
+
+## v0.42.0 (2025-07-17)
+
+### Feat
+
+- **llamaindex**: support llamaparse instrumentation (#3103)
+- **milvus**: add semantic convention for Milvus DB metrics (#3015)
+
+### Fix
+
+- **openai-agents**: fix broken traces with agents handoff on run_stream (#3143)
+- **traceloop-sdk**: redefine histogram bucket boundaries (#3129)
+
 ## v0.41.0 (2025-07-13)
 
 ### Feat

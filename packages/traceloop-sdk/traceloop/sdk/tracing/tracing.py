@@ -85,7 +85,7 @@ class TracerWrapper(object):
                 return obj
 
             obj.__image_uploader = image_uploader
-            obj.__resource = Resource(attributes=TracerWrapper.resource_attributes)
+            obj.__resource = Resource.create(TracerWrapper.resource_attributes)
             obj.__tracer_provider = init_tracer_provider(resource=obj.__resource, sampler=sampler)
 
             # Handle multiple processors case
@@ -428,9 +428,10 @@ def init_instrumentations(
     block_instruments: Optional[Set[Instruments]] = None,
 ):
     block_instruments = block_instruments or set()
-    instruments = instruments or set(
+    # explictly test for None since empty set is a False value
+    instruments = instruments if instruments is not None else set(
         Instruments
-    )  # Use all instruments if none specified
+    )
 
     # Remove any instruments that were explicitly blocked
     instruments = instruments - block_instruments
@@ -454,7 +455,7 @@ def init_instrumentations(
         elif instrument == Instruments.COHERE:
             if init_cohere_instrumentor():
                 instrument_set = True
-        elif instrument == Instruments.CREW:
+        elif instrument == Instruments.CREWAI:
             if init_crewai_instrumentor():
                 instrument_set = True
         elif instrument == Instruments.GOOGLE_GENERATIVEAI:
@@ -536,6 +537,9 @@ def init_instrumentations(
                 instrument_set = True
         elif instrument == Instruments.WEAVIATE:
             if init_weaviate_instrumentor():
+                instrument_set = True
+        elif instrument == Instruments.WRITER:
+            if init_writer_instrumentor():
                 instrument_set = True
         else:
             print(Fore.RED + f"Warning: {instrument} instrumentation does not exist.")
@@ -999,6 +1003,24 @@ def init_weaviate_instrumentor():
     return False
 
 
+def init_writer_instrumentor():
+    try:
+        if is_package_installed("writer-sdk"):
+            Telemetry().capture("instrumentation:writer:init")
+            from opentelemetry.instrumentation.writer import WriterInstrumentor
+
+            instrumentor = WriterInstrumentor(
+                exception_logger=lambda e: Telemetry().log_exception(e),
+            )
+            if not instrumentor.is_instrumented_by_opentelemetry:
+                instrumentor.instrument()
+            return True
+    except Exception as e:
+        logging.error(f"Error initializing Writer instrumentor: {e}")
+        Telemetry().log_exception(e)
+    return False
+
+
 def init_alephalpha_instrumentor():
     try:
         if is_package_installed("aleph_alpha_client"):
@@ -1110,9 +1132,7 @@ def init_mcp_instrumentor():
             Telemetry().capture("instrumentation:mcp:init")
             from opentelemetry.instrumentation.mcp import McpInstrumentor
 
-            instrumentor = McpInstrumentor(
-                exception_logger=lambda e: Telemetry().log_exception(e),
-            )
+            instrumentor = McpInstrumentor()
             if not instrumentor.is_instrumented_by_opentelemetry:
                 instrumentor.instrument()
             return True

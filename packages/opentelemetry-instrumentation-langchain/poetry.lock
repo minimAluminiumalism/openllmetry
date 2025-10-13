@@ -3954,7 +3954,7 @@ widechars = ["wcwidth"]
 
 [[package]]
 name = "tapm-instrumentation-openai"
-version = "0.43.1a2"
+version = "0.43.1a4"
 description = "OpenTelemetry OpenAI instrumentation"
 optional = false
 python-versions = ">=3.9,<4"

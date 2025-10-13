@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Type, Union
 from uuid import UUID
 from langchain_core.callbacks import (
     BaseCallbackHandler,
+    CallbackManager,
+    AsyncCallbackManager,
 )
 from langchain_core.messages import (
     AIMessage,
@@ -34,6 +36,7 @@ from opentelemetry.instrumentation.langchain.span_utils import (
     SpanHolder,
     _set_span_attribute,
     extract_model_name_from_response_metadata,
+    _extract_model_name_from_association_metadata,
     set_chat_request,
     set_chat_response,
     set_chat_response_usage,
@@ -50,7 +53,7 @@ from opentelemetry.instrumentation.langchain.utils import (
     should_send_prompts,
 )
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
-from opentelemetry.metrics import Histogram
+from opentelemetry.metrics import Histogram, Counter
 from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import (
     GEN_AI_RESPONSE_ID,
 )
@@ -67,6 +70,7 @@ from opentelemetry.semconv_ai.genai_entry import (
 from opentelemetry.trace import SpanKind, Tracer, set_span_in_context
 from opentelemetry.trace.span import Span
 from opentelemetry.trace.status import Status, StatusCode
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 
 
 def _extract_class_name_from_serialized(serialized: Optional[dict[str, Any]]) -> str:
@@ -152,14 +156,26 @@ def _extract_tool_call_data(
 
 class TraceloopCallbackHandler(BaseCallbackHandler):
     def __init__(
-        self, tracer: Tracer, duration_histogram: Histogram, token_histogram: Histogram
+        self,
+        tracer: Tracer,
+        duration_histogram: Histogram,
+        token_histogram: Histogram,
+        ttft_histogram: Optional[Histogram] = None,
+        streaming_time_histogram: Optional[Histogram] = None,
+        choices_counter: Optional[Counter] = None,
+        exception_counter: Optional[Counter] = None
     ) -> None:
         super().__init__()
         self.tracer = tracer
         self.duration_histogram = duration_histogram
         self.token_histogram = token_histogram
+        self.ttft_histogram = ttft_histogram
+        self.streaming_time_histogram = streaming_time_histogram
+        self.choices_counter = choices_counter
+        self.exception_counter = exception_counter
         self.spans: dict[UUID, SpanHolder] = {}
         self.run_inline = True
+        self._callback_manager: CallbackManager | AsyncCallbackManager = None
 
     @staticmethod
     def _get_name_from_callback(
@@ -182,6 +198,38 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
 
     def _get_span(self, run_id: UUID) -> Span:
         return self.spans[run_id].span
+
+    def _create_shared_attributes(
+        self, span, model_name: str, operation_type: str = None, is_streaming: bool = False
+    ) -> dict:
+        """Create shared attributes for metrics."""
+        vendor = span.attributes.get(SpanAttributes.LLM_SYSTEM, "Langchain")
+        attributes = {
+            SpanAttributes.LLM_SYSTEM: vendor,
+            SpanAttributes.LLM_RESPONSE_MODEL: model_name,
+        }
+        if operation_type:
+            attributes["gen_ai.operation.name"] = operation_type
+        elif span.attributes.get(SpanAttributes.LLM_REQUEST_TYPE):
+            attributes["gen_ai.operation.name"] = span.attributes.get(SpanAttributes.LLM_REQUEST_TYPE)
+        server_address = None
+        try:
+            association_properties = context_api.get_value("association_properties") or {}
+            server_address = (
+                association_properties.get("api_base") or
+                association_properties.get("endpoint") or
+                association_properties.get("base_url") or
+                association_properties.get("server_address")
+            )
+        except Exception:
+            pass
+        if not server_address:
+            server_address = span.attributes.get("server.address")
+        if server_address:
+            attributes["server.address"] = server_address
+        if is_streaming:
+            attributes["stream"] = True
+        return attributes
 
     # for entry span detection and marking
     def _should_mark_as_genai_entry(self, parent_run_id: Optional[UUID]) -> bool:
@@ -409,7 +457,7 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         # Mark as GenAI entry if this is a top-level operation
         if self._should_mark_as_genai_entry(parent_run_id):
             span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
-        set_request_params(span, kwargs, self.spans[run_id])
+        set_request_params(span, kwargs, self.spans[run_id], serialized, metadata)
         if should_emit_events():
             self._emit_chat_input_events(messages)
         else:
@@ -437,12 +485,48 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         # Mark as GenAI entry if this is a top-level operation
         if self._should_mark_as_genai_entry(parent_run_id):
             span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
-        set_request_params(span, kwargs, self.spans[run_id])
+        set_request_params(span, kwargs, self.spans[run_id], serialized, metadata)
         if should_emit_events():
             for prompt in prompts:
                 emit_event(MessageEvent(content=prompt, role="user"))
         else:
             set_llm_request(span, serialized, prompts, kwargs, self.spans[run_id])
+
+    @dont_throw
+    def on_llm_new_token(
+        self,
+        token: str,
+        *,
+        chunk: Optional[Union[GenerationChunk, ChatGenerationChunk]] = None,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> Any:
+        if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
+            return
+        if run_id not in self.spans:
+            return
+        span_holder = self.spans[run_id]
+        current_time = time.time()
+        if getattr(span_holder, "first_token_time", None) is None:
+            span_holder.first_token_time = current_time
+            ttft = current_time - span_holder.start_time
+            span = span_holder.span
+            try:
+                from opentelemetry.instrumentation.langchain.span_utils import _get_unified_unknown_model
+            except Exception:
+                def _get_unified_unknown_model(**_):
+                    return "unknown"
+            model_name = (
+                span.attributes.get(SpanAttributes.LLM_RESPONSE_MODEL) or
+                getattr(span_holder, "request_model", None) or
+                _get_unified_unknown_model(existing_model=getattr(span_holder, "request_model", None))
+            )
+            if self.ttft_histogram is not None:
+                self.ttft_histogram.record(
+                    ttft,
+                    attributes=self._create_shared_attributes(span, model_name, is_streaming=True)
+                )
 
     def on_llm_end(
         self,
@@ -471,6 +555,27 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 _set_span_attribute(span, GEN_AI_RESPONSE_ID, id)
         if model_name is None:
             model_name = extract_model_name_from_response_metadata(response)
+        if model_name is None:
+            try:
+                association_properties = context_api.get_value("association_properties") or {}
+            except Exception:
+                association_properties = {}
+            model_name = _extract_model_name_from_association_metadata(association_properties)
+        if model_name is None and run_id in self.spans and getattr(self.spans[run_id], "request_model", None):
+            model_name = self.spans[run_id].request_model
+        if model_name is None:
+            try:
+                from opentelemetry.instrumentation.langchain.span_utils import _get_unified_unknown_model
+            except Exception:
+                def _get_unified_unknown_model(**_):
+                    return "unknown"
+            existing_model = (
+                getattr(self.spans.get(run_id, None), "request_model", None)
+                if isinstance(self.spans, dict)
+                else None
+            )
+            model_name = _get_unified_unknown_model(existing_model=existing_model)
+        _set_span_attribute(span, SpanAttributes.LLM_RESPONSE_MODEL, model_name)
         token_usage = (response.llm_output or {}).get("token_usage") or (
             response.llm_output or {}
         ).get("usage")
@@ -498,41 +603,34 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 span, SpanAttributes.LLM_USAGE_TOTAL_TOKENS, total_tokens
             )
             # Record token usage metrics
-            vendor = span.attributes.get(SpanAttributes.LLM_SYSTEM, "Langchain")
+            base_attrs = self._create_shared_attributes(span, model_name)
             if prompt_tokens > 0:
-                self.token_histogram.record(
-                    prompt_tokens,
-                    attributes={
-                        SpanAttributes.LLM_SYSTEM: vendor,
-                        SpanAttributes.LLM_TOKEN_TYPE: "input",
-                        SpanAttributes.LLM_RESPONSE_MODEL: model_name or "unknown",
-                    },
-                )
+                input_attrs = {**base_attrs, SpanAttributes.LLM_TOKEN_TYPE: "input"}
+                self.token_histogram.record(prompt_tokens, attributes=input_attrs)
             if completion_tokens > 0:
-                self.token_histogram.record(
-                    completion_tokens,
-                    attributes={
-                        SpanAttributes.LLM_SYSTEM: vendor,
-                        SpanAttributes.LLM_TOKEN_TYPE: "output",
-                        SpanAttributes.LLM_RESPONSE_MODEL: model_name or "unknown",
-                    },
-                )
+                output_attrs = {**base_attrs, SpanAttributes.LLM_TOKEN_TYPE: "output"}
+                self.token_histogram.record(completion_tokens, attributes=output_attrs)
         set_chat_response_usage(span, response, self.token_histogram, token_usage is None, model_name)
         if should_emit_events():
             self._emit_llm_end_events(response)
         else:
             set_chat_response(span, response)
+        # Record generation choices count and streaming metrics before ending span
+        total_choices = 0
+        for generation_list in response.generations:
+            total_choices += len(generation_list)
+        span_holder = self.spans[run_id]
+        current_time = time.time()
+        is_streaming_request = getattr(span_holder, "first_token_time", None) is not None
+        shared_attrs = self._create_shared_attributes(span, model_name, is_streaming=is_streaming_request)
+        if total_choices > 0 and self.choices_counter is not None:
+            self.choices_counter.add(total_choices, attributes=shared_attrs)
+        if getattr(span_holder, "first_token_time", None) is not None and self.streaming_time_histogram is not None:
+            streaming_time = current_time - span_holder.first_token_time
+            self.streaming_time_histogram.record(streaming_time, attributes=shared_attrs)
+        duration = current_time - span_holder.start_time
+        self.duration_histogram.record(duration, attributes=shared_attrs)
         self._end_span(span, run_id)
-        # Record duration
-        duration = time.time() - self.spans[run_id].start_time
-        vendor = span.attributes.get(SpanAttributes.LLM_SYSTEM, "Langchain")
-        self.duration_histogram.record(
-            duration,
-            attributes={
-                SpanAttributes.LLM_SYSTEM: vendor,
-                SpanAttributes.LLM_RESPONSE_MODEL: model_name or "unknown",
-            },
-        )
 
     @dont_throw
     def on_tool_start(
@@ -638,6 +736,22 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         span = self._get_span(run_id)
         span.set_status(Status(StatusCode.ERROR))
         span.record_exception(error)
+        # Exception metric
+        if run_id in self.spans and self.exception_counter is not None:
+            span_holder = self.spans[run_id]
+            try:
+                from opentelemetry.instrumentation.langchain.span_utils import _get_unified_unknown_model
+            except Exception:
+                def _get_unified_unknown_model(**_):
+                    return "unknown"
+            model_name = (
+                span.attributes.get(SpanAttributes.LLM_RESPONSE_MODEL) or
+                getattr(span_holder, "request_model", None) or
+                _get_unified_unknown_model(existing_model=getattr(span_holder, "request_model", None))
+            )
+            exception_attrs = self._create_shared_attributes(span, model_name)
+            exception_attrs[ERROR_TYPE] = type(error).__name__
+            self.exception_counter.add(1, attributes=exception_attrs)
         self._end_span(span, run_id)
 
     @dont_throw
@@ -674,6 +788,11 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when tool errors."""
+        span = self._get_span(run_id)
+        try:
+            span.set_attribute(ERROR_TYPE, type(error).__name__)
+        except Exception:
+            pass
         self._handle_error(error, run_id, parent_run_id, **kwargs)
 
     @dont_throw

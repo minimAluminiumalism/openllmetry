@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 from langchain_core.outputs import LLMResult, Generation
 from opentelemetry.instrumentation.langchain.callback_handler import TraceloopCallbackHandler
-from opentelemetry.instrumentation.langchain.span_utils import SpanHolder
+from opentelemetry.instrumentation.langchain.span_utils import SpanHolder, set_request_params
 from opentelemetry.semconv_ai import SpanAttributes
 from opentelemetry.trace import Span
 
@@ -65,6 +65,7 @@ class TestStreamingMetrics:
             assert abs(ttft_value - 0.1) < 0.001
             attributes = args[1]["attributes"]
             assert attributes[SpanAttributes.LLM_SYSTEM] == "Langchain"
+            mock_span.set_attribute.assert_any_call(SpanAttributes.LLM_IS_STREAMING, True)
 
     def test_ttft_metric_not_recorded_on_subsequent_tokens(self):
         """Test that TTFT metric is only recorded once."""
@@ -158,6 +159,7 @@ class TestStreamingMetrics:
             self.handler.on_llm_end(llm_result, run_id=run_id)
 
             self.streaming_time_histogram.record.assert_called_once()
+            mock_span.set_attribute.assert_any_call(SpanAttributes.LLM_IS_STREAMING, True)
 
     def test_exception_metric_recorded_on_error(self):
         """Test that exception metric is recorded on LLM errors."""
@@ -208,3 +210,85 @@ class TestStreamingMetrics:
         self.handler.on_llm_end(llm_result, run_id=run_id)
 
         self.streaming_time_histogram.record.assert_not_called()
+        mock_span.set_attribute.assert_any_call(SpanAttributes.LLM_IS_STREAMING, False)
+
+    def test_request_params_sets_streaming_attribute(self):
+        """Ensure request params flag streaming on the span."""
+        run_id = uuid4()
+        mock_span = Mock(spec=Span)
+        mock_span.attributes = {SpanAttributes.LLM_SYSTEM: "Langchain"}
+
+        span_holder = SpanHolder(
+            span=mock_span,
+            token=None,
+            context=None,
+            children=[],
+            workflow_name="test",
+            entity_name="test",
+            entity_path="test"
+        )
+        kwargs = {
+            "model": "test-model",
+            "streaming": True,
+        }
+
+        set_request_params(mock_span, kwargs, span_holder)
+
+        mock_span.set_attribute.assert_any_call(SpanAttributes.LLM_IS_STREAMING, True)
+        assert span_holder.is_streaming is True
+
+    def test_exception_metric_includes_streaming_flag(self):
+        """Test that exception metrics include streaming flag for streaming requests."""
+        run_id = uuid4()
+        mock_span = Mock(spec=Span)
+        mock_span.attributes = {SpanAttributes.LLM_SYSTEM: "Langchain", SpanAttributes.LLM_RESPONSE_MODEL: "test-model"}
+
+        span_holder = SpanHolder(
+            span=mock_span,
+            token=None,
+            context=None,
+            children=[],
+            workflow_name="test",
+            entity_name="test",
+            entity_path="test",
+            start_time=time.time()
+        )
+        span_holder.is_streaming = True  # Mark as streaming request
+        self.handler.spans[run_id] = span_holder
+
+        error = ValueError("API Error")
+        self.handler.on_llm_error(error, run_id=run_id)
+
+        # Verify exception counter was called with streaming=True in attributes
+        self.exception_counter.add.assert_called_once()
+        call_args = self.exception_counter.add.call_args
+        attributes = call_args[1]["attributes"]
+        assert attributes.get("stream") is True, "Streaming flag should be present in exception metrics"
+
+    def test_exception_metric_excludes_streaming_flag_for_non_streaming(self):
+        """Test that exception metrics don't include streaming flag for non-streaming requests."""
+        run_id = uuid4()
+        mock_span = Mock(spec=Span)
+        mock_span.attributes = {SpanAttributes.LLM_SYSTEM: "Langchain", SpanAttributes.LLM_RESPONSE_MODEL: "test-model"}
+
+        span_holder = SpanHolder(
+            span=mock_span,
+            token=None,
+            context=None,
+            children=[],
+            workflow_name="test",
+            entity_name="test",
+            entity_path="test",
+            start_time=time.time()
+        )
+        span_holder.is_streaming = False  # Mark as non-streaming request
+        self.handler.spans[run_id] = span_holder
+
+        error = ValueError("API Error")
+        self.handler.on_llm_error(error, run_id=run_id)
+
+        # Verify exception counter was called without streaming flag
+        self.exception_counter.add.assert_called_once()
+        call_args = self.exception_counter.add.call_args
+        attributes = call_args[1]["attributes"]
+        assert "stream" not in attributes, "Streaming flag should not be present for non-streaming requests"

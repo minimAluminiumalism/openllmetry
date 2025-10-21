@@ -347,6 +347,8 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         vendor = detect_vendor_from_class(_extract_class_name_from_serialized(serialized))
         _set_span_attribute(span, SpanAttributes.LLM_SYSTEM, vendor)
         _set_span_attribute(span, SpanAttributes.LLM_REQUEST_TYPE, request_type.value)
+        _set_span_attribute(span, SpanAttributes.LLM_IS_STREAMING, False)
+        self.spans[run_id].is_streaming = False
         return span
 
     @dont_throw
@@ -480,7 +482,7 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             return
         name = self._get_name_from_callback(serialized, kwargs=kwargs)
         span = self._create_llm_span(
-            run_id, parent_run_id, name, LLMRequestTypeValues.COMPLETION, serialized=serialized
+            run_id, parent_run_id, name, LLMRequestTypeValues.COMPLETION, metadata=metadata, serialized=serialized
         )
         # Mark as GenAI entry if this is a top-level operation
         if self._should_mark_as_genai_entry(parent_run_id):
@@ -512,6 +514,8 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             span_holder.first_token_time = current_time
             ttft = current_time - span_holder.start_time
             span = span_holder.span
+            span_holder.is_streaming = True
+            _set_span_attribute(span, SpanAttributes.LLM_IS_STREAMING, True)
             try:
                 from opentelemetry.instrumentation.langchain.span_utils import _get_unified_unknown_model
             except Exception:
@@ -621,7 +625,11 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             total_choices += len(generation_list)
         span_holder = self.spans[run_id]
         current_time = time.time()
-        is_streaming_request = getattr(span_holder, "first_token_time", None) is not None
+        is_streaming_request = (
+            getattr(span_holder, "is_streaming", False) is True
+            or getattr(span_holder, "first_token_time", None) is not None
+        )
+        _set_span_attribute(span, SpanAttributes.LLM_IS_STREAMING, is_streaming_request)
         shared_attrs = self._create_shared_attributes(span, model_name, is_streaming=is_streaming_request)
         if total_choices > 0 and self.choices_counter is not None:
             self.choices_counter.add(total_choices, attributes=shared_attrs)
@@ -749,7 +757,11 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 getattr(span_holder, "request_model", None) or
                 _get_unified_unknown_model(existing_model=getattr(span_holder, "request_model", None))
             )
-            exception_attrs = self._create_shared_attributes(span, model_name)
+            is_streaming = (
+                getattr(span_holder, "is_streaming", False) is True
+                or getattr(span_holder, "first_token_time", None) is not None
+            )
+            exception_attrs = self._create_shared_attributes(span, model_name, is_streaming=is_streaming)
             exception_attrs[ERROR_TYPE] = type(error).__name__
             self.exception_counter.add(1, attributes=exception_attrs)
         self._end_span(span, run_id)

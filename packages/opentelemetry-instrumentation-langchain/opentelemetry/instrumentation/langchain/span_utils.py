@@ -35,6 +35,7 @@ class SpanHolder:
     start_time: float = field(default_factory=time.time)
     request_model: Optional[str] = None
     first_token_time: Optional[float] = None
+    is_streaming: Optional[bool] = None
 
 
 def _message_type_to_role(message_type: str) -> str:
@@ -222,6 +223,22 @@ def set_request_params(
             f"{SpanAttributes.LLM_REQUEST_FUNCTIONS}.{i}.parameters",
             json.dumps(tool_function.get("parameters", tool.get("input_schema"))),
         )
+
+    streaming_flag = kwargs.get("streaming")
+    if streaming_flag is None:
+        streaming_flag = kwargs.get("stream")
+    if streaming_flag is None:
+        streaming_flag = (kwargs.get("invocation_params") or {}).get("streaming")
+    if streaming_flag is None:
+        streaming_flag = (kwargs.get("invocation_params") or {}).get("stream")
+    if streaming_flag is None and metadata:
+        streaming_flag = metadata.get("streaming")
+    if streaming_flag is None and kwargs.get("metadata"):
+        streaming_flag = (kwargs.get("metadata") or {}).get("streaming")
+
+    if streaming_flag is not None:
+        span_holder.is_streaming = bool(streaming_flag)
+        _set_span_attribute(span, SpanAttributes.LLM_IS_STREAMING, span_holder.is_streaming)
 
 
 def set_llm_request(

@@ -1700,6 +1700,57 @@ async def test_trace_propagation_stream_async_with_events_with_no_content(
     assert_message_in_logs(logs[1], "gen_ai.choice", choice_event)
 
 
+@pytest.mark.vcr
+def test_deepseek_streaming_attributes(instrument_legacy, span_exporter, log_exporter):
+    try:
+        from langchain_deepseek import ChatDeepSeek
+    except ImportError:
+        pytest.skip("langchain-deepseek not installed")
+
+    prompt = ChatPromptTemplate.from_messages(
+        [("system", "You are a helpful assistant"), ("human", "{input}")]
+    )
+    
+    model = ChatDeepSeek(
+        model="deepseek-chat",
+        base_url="https://api.deepseek.com",
+        streaming=True,
+        temperature=0.7
+    )
+    
+    chain = prompt | model
+
+    chunks = []
+    for chunk in chain.stream({"input": "What is machine learning? Answer in one sentence."}):
+        chunks.append(chunk)
+    
+    assert len(chunks) > 1, "Expected multiple chunks from streaming response"
+
+    spans = span_exporter.get_finished_spans()
+
+    assert len(spans) > 0, "Expected at least one span"
+
+    deepseek_span = next(
+        (span for span in spans 
+         if span.attributes.get(SpanAttributes.LLM_REQUEST_TYPE) == "chat"),
+        None
+    )
+    
+    assert deepseek_span is not None, f"Could not find LLM chat span. Available spans: {[s.name for s in spans]}"
+
+    assert deepseek_span.attributes.get(SpanAttributes.LLM_REQUEST_TYPE) == "chat"
+    assert deepseek_span.attributes.get(SpanAttributes.LLM_REQUEST_MODEL) == "deepseek-chat"
+    assert deepseek_span.attributes.get(SpanAttributes.LLM_IS_STREAMING) is True, \
+        "LLM_IS_STREAMING attribute should be True for streaming requests"
+    
+    assert deepseek_span.attributes.get(SpanAttributes.LLM_RESPONSE_MODEL) is not None
+
+    logs = log_exporter.get_finished_logs()
+    assert len(logs) == 0, (
+        "Assert that it doesn't emit logs when use_legacy_attributes is True"
+    )
+
+
 def assert_message_in_logs(log: LogData, event_name: str, expected_content: dict):
     assert log.log_record.attributes.get(EventAttributes.EVENT_NAME) == event_name
     assert log.log_record.attributes.get(GenAIAttributes.GEN_AI_SYSTEM) == "langchain"

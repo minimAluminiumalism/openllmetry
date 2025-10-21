@@ -26,6 +26,9 @@ GENAI_ENTRY_ATTRIBUTE = "gen_ai.is_entry"
 # Thread-local storage for tracking GenAI operation nesting depth
 _thread_local = threading.local()
 
+# Thread-local storage for recursion detection
+_recursion_guard = threading.local()
+
 # Circuit breaker for error handling
 _circuit_breaker = {
     'failures': 0,
@@ -197,6 +200,40 @@ def _set_genai_operation_state(active: bool) -> None:
         logger.debug(f"Error setting GenAI thread-local state: {e}")
 
 
+def _is_in_recursion() -> bool:
+    """Check if we're already in a span creation recursion."""
+    try:
+        return getattr(_recursion_guard, 'in_span_creation', False)
+    except Exception:
+        return False
+
+
+def _set_recursion_guard(active: bool) -> None:
+    """Set recursion guard state."""
+    try:
+        _recursion_guard.in_span_creation = active
+    except Exception:
+        pass
+
+
+def _find_original_start_span(tracer):
+    """
+    Try to find the truly original start_span method, bypassing all wrappers.
+    This helps avoid calling wrapped versions that could cause recursion.
+    """
+    try:
+        # Try to get the original method from the class
+        if hasattr(tracer, '__class__'):
+            original_method = getattr(tracer.__class__, 'start_span', None)
+            if original_method and callable(original_method):
+                return original_method
+        
+        # Fallback: return the current method
+        return getattr(tracer, 'start_span', None)
+    except Exception:
+        return None
+
+
 def mark_span_as_genai_entry(span) -> None:
     """
     Mark a span as GenAI entry point only if it's not nested within another GenAI operation.
@@ -224,10 +261,36 @@ def mark_span_as_genai_entry(span) -> None:
 
 
 def _safe_span_interceptor(original_start_span, expected_depth: int):
-    """Create a safe span interceptor with error isolation."""
+    """Create a safe span interceptor with error isolation and recursion detection."""
     def enhanced_start_span(*span_args, **span_kwargs):
+        # CRITICAL: Recursion detection - prevent infinite loops
+        if _is_in_recursion():
+            # If we detect recursion, return a non-recording span to break the cycle
+            try:
+                from opentelemetry.trace import NonRecordingSpan
+                return NonRecordingSpan()
+            except Exception:
+                # Last resort: try to find and call the truly original method
+                try:
+                    tracer = span_args[0] if span_args else None
+                    if tracer:
+                        original_method = _find_original_start_span(tracer)
+                        if original_method and original_method != enhanced_start_span:
+                            return original_method(tracer, *span_args[1:], **span_kwargs)
+                except Exception:
+                    pass
+                # Final fallback: return non-recording span
+                try:
+                    from opentelemetry.trace import NonRecordingSpan
+                    return NonRecordingSpan()
+                except Exception:
+                    return None
+
         span = None
         try:
+            # Set recursion guard BEFORE calling original_start_span
+            _set_recursion_guard(True)
+            
             # Always create the span first
             span = original_start_span(*span_args, **span_kwargs)
 
@@ -239,14 +302,25 @@ def _safe_span_interceptor(original_start_span, expected_depth: int):
                     span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
                     _record_circuit_breaker_success()
             except Exception as entry_error:
-                logger.debug(f"Error in GenAI entry detection: {entry_error}")
+                # Use print instead of logger to avoid potential recursion in logging
+                try:
+                    print(f"DEBUG: Error in GenAI entry detection: {entry_error}")
+                except Exception:
+                    pass  # Even print can fail in extreme cases
                 _record_circuit_breaker_failure()
                 # Continue without entry detection
 
         except Exception as span_error:
-            logger.error(f"Critical error in span creation: {span_error}")
+            # Use print instead of logger.error to avoid recursion in logging
+            try:
+                print(f"ERROR: Critical error in span creation: {span_error}")
+            except Exception:
+                pass  # Even print can fail in extreme cases
             # Re-raise span creation errors as they are critical
             raise
+        finally:
+            # ALWAYS clear recursion guard
+            _set_recursion_guard(False)
 
         return span
 
@@ -343,19 +417,37 @@ def with_genai_entry_detection(wrapper_func):
                 if len(args) > 0 and hasattr(args[0], 'start_span'):
                     tracer = args[0]
                     original_start_span = tracer.start_span
-                    tracer.start_span = _safe_span_interceptor(original_start_span, depth)
+                    
+                    # Check if we've already wrapped this tracer to avoid double-wrapping
+                    if not hasattr(original_start_span, '_genai_entry_wrapped'):
+                        enhanced_span_func = _safe_span_interceptor(original_start_span, depth)
+                        # Mark the enhanced function to prevent double-wrapping
+                        enhanced_span_func._genai_entry_wrapped = True
+                        enhanced_span_func._original_start_span = original_start_span
+                        tracer.start_span = enhanced_span_func
+                    else:
+                        # Already wrapped, use the original function stored in the wrapper
+                        original_start_span = getattr(original_start_span, '_original_start_span', original_start_span)
 
                 # Call the original wrapper function
                 result = wrapper_func(*args, **kwargs)
                 return result
 
             except Exception as e:
-                logger.debug(f"Error in GenAI entry detection wrapper: {e}")
+                # Use print instead of logger to avoid potential recursion
+                try:
+                    print(f"DEBUG: Error in GenAI entry detection wrapper: {e}")
+                except Exception:
+                    pass  # Even print can fail in extreme cases
                 _record_circuit_breaker_failure()
                 # Always continue with original function to avoid breaking user code
                 try:
                     if original_start_span is not None and tracer is not None:
-                        tracer.start_span = original_start_span
+                        # If we wrapped the tracer, restore the original method
+                        if hasattr(tracer.start_span, '_genai_entry_wrapped'):
+                            tracer.start_span = getattr(tracer.start_span, '_original_start_span', original_start_span)
+                        else:
+                            tracer.start_span = original_start_span
                     return wrapper_func(*args, **kwargs)
                 except Exception:
                     raise  # Re-raise the original exception
@@ -364,15 +456,27 @@ def with_genai_entry_detection(wrapper_func):
                 # Always cleanup, even if errors occurred
                 try:
                     if original_start_span is not None and tracer is not None:
-                        tracer.start_span = original_start_span
+                        # If we wrapped the tracer, restore the original method
+                        if hasattr(tracer.start_span, '_genai_entry_wrapped'):
+                            tracer.start_span = getattr(tracer.start_span, '_original_start_span', original_start_span)
+                        else:
+                            tracer.start_span = original_start_span
                 except Exception as cleanup_error:
-                    logger.debug(f"Error restoring original start_span: {cleanup_error}")
+                    # Use print instead of logger to avoid potential recursion
+                    try:
+                        print(f"DEBUG: Error restoring original start_span: {cleanup_error}")
+                    except Exception:
+                        pass  # Even print can fail in extreme cases
 
                 try:
                     if depth is not None:
                         _decrement_genai_depth()
                 except Exception as depth_error:
-                    logger.debug(f"Error decrementing depth: {depth_error}")
+                    # Use print instead of logger to avoid potential recursion
+                    try:
+                        print(f"DEBUG: Error decrementing depth: {depth_error}")
+                    except Exception:
+                        pass  # Even print can fail in extreme cases
                     # Attempt to reset state on persistent errors
                     _reset_thread_local_state()
 

@@ -8,7 +8,7 @@ show_missing = true
 
 [tool.poetry]
 name = "tapm-instrumentation-llamaindex"
-version = "0.43.1a2"
+version = "0.43.2"
 description = "OpenTelemetry LlamaIndex instrumentation"
 authors = ["Wilson Cai <wilsonxscai@tencent.com>"]
 repository = "https://github.com/traceloop/openllmetry/tree/main/packages/opentelemetry-instrumentation-llamaindex"
@@ -24,7 +24,7 @@ opentelemetry-api = "^1.28.0"
 opentelemetry-instrumentation = ">=0.50b0"
 opentelemetry-semantic-conventions = ">=0.50b0"
 inflection = "^0.5.1"
-tapm-semantic-conventions-ai = "0.4.11a1"
+tapm-semantic-conventions-ai = "0.4.12"
 llama-index-llms-openai-like = "0.4.0"
 
 [tool.poetry.group.dev.dependencies]

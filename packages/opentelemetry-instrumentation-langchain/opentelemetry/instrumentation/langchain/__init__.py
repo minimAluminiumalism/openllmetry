@@ -253,6 +253,9 @@ class _OpenAITracingWrapper:
         args,
         kwargs,
     ) -> None:
+        from opentelemetry import context as context_api
+        from opentelemetry.semconv_ai import SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY
+        
         run_manager = kwargs.get("run_manager")
         if run_manager:
             run_id = run_manager.run_id
@@ -266,5 +269,16 @@ class _OpenAITracingWrapper:
 
             # Update kwargs to include the modified headers
             kwargs["extra_headers"] = extra_headers
+
+        # In legacy chains like LLMChain, suppressing model instrumentations
+        # within create_llm_span doesn't work, so this should helps as a fallback
+        try:
+            context_api.attach(
+                context_api.set_value(SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY, True)
+            )
+        except Exception:
+            # If context setting fails, continue without suppression
+            # This is not critical for core functionality
+            pass
 
         return wrapped(*args, **kwargs)

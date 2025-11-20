@@ -245,12 +245,62 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         # Mark as entry if it's the top-level call (no parent or parent not tracked)
         return parent_run_id is None or parent_run_id not in self.spans
 
+    def _safe_attach_context(self, span: Span):
+        """
+        Safely attach span to context, handling potential failures in async scenarios.
+
+        Returns the context token for later detachment, or None if attachment fails.
+        """
+        try:
+            return context_api.attach(set_span_in_context(span))
+        except Exception:
+            # Context attachment can fail in some edge cases, particularly in
+            # complex async scenarios or when context is corrupted.
+            # Return None to indicate no token needs to be detached later.
+            return None
+
+    def _safe_detach_context(self, token):
+        """
+        Safely detach context token without causing application crashes.
+
+        This method implements a fail-safe approach to context detachment that handles
+        all known edge cases in async/concurrent scenarios where context tokens may
+        become invalid or be detached in different execution contexts.
+
+        We use the runtime context directly to avoid logging errors from context_api.detach()
+        """
+        if not token:
+            return
+
+        try:
+            # Use the runtime context directly to avoid error logging from context_api.detach()
+            from opentelemetry.context import _RUNTIME_CONTEXT
+
+            _RUNTIME_CONTEXT.detach(token)
+        except Exception:
+            # Context detach can fail in async scenarios when tokens are created in different contexts
+            # This includes ValueError, RuntimeError, and other context-related exceptions
+            # This is expected behavior and doesn't affect the correct span hierarchy
+            #
+            # Common scenarios where this happens:
+            # 1. Token created in one async task/thread, detached in another
+            # 2. Context was already detached by another process
+            # 3. Token became invalid due to context switching
+            # 4. Race conditions in highly concurrent scenarios
+            #
+            # This is safe to ignore as the span itself was properly ended
+            # and the tracing data is correctly captured.
+            pass
+
     def _end_span(self, span: Span, run_id: UUID) -> None:
         for child_id in self.spans[run_id].children:
             child_span = self.spans[child_id].span
             if child_span.end_time is None:  # avoid warning on ended spans
                 child_span.end()
         span.end()
+        token = self.spans[run_id].token
+        if token:
+            self._safe_detach_context(token)
 
     def _create_span(
         self,
@@ -263,6 +313,7 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         entity_path: str = "",
         metadata: Optional[dict[str, Any]] = None,
     ) -> Span:
+        sanitized_metadata = {}
         if metadata is not None:
             current_association_properties = (
                 context_api.get_value("association_properties") or {}
@@ -273,12 +324,22 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 for k, v in metadata.items()
                 if v is not None
             }
-            context_api.attach(
-                context_api.set_value(
-                    "association_properties",
-                    {**current_association_properties, **sanitized_metadata},
+            try:
+                context_api.attach(
+                    context_api.set_value(
+                        "association_properties",
+                        {**current_association_properties, **sanitized_metadata},
+                    )
                 )
-            )
+            except Exception:
+                # If setting association properties fails, continue without them
+                # This doesn't affect the core span functionality
+                pass
+
+        # Get current context to maintain parent-child relationship
+        # This ensures spans inherit session_id and user_id from parent
+        current_ctx = context_api.get_current()
+        
         if parent_run_id is not None and parent_run_id in self.spans:
             span = self.tracer.start_span(
                 span_name,
@@ -286,17 +347,30 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
                 kind=kind,
             )
         else:
-            span = self.tracer.start_span(span_name, kind=kind)
+            # Pass current context to enable attribute inheritance from parent spans
+            span = self.tracer.start_span(span_name, kind=kind, context=current_ctx)
+
+        token = self._safe_attach_context(span)
+
         _set_span_attribute(span, SpanAttributes.TRACELOOP_WORKFLOW_NAME, workflow_name)
         _set_span_attribute(span, SpanAttributes.TRACELOOP_ENTITY_PATH, entity_path)
-        token = context_api.attach(
-            context_api.set_value(SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY, True)
-        )
+
+        # Set metadata as span attributes if available
+        if metadata is not None:
+            for key, value in sanitized_metadata.items():
+                _set_span_attribute(
+                    span,
+                    f"{SpanAttributes.TRACELOOP_ASSOCIATION_PROPERTIES}.{key}",
+                    value,
+                )
+
         self.spans[run_id] = SpanHolder(
             span, token, None, [], workflow_name, entity_name, entity_path
         )
+
         if parent_run_id is not None and parent_run_id in self.spans:
             self.spans[parent_run_id].children.append(run_id)
+
         return span
 
     def _create_task_span(
@@ -347,8 +421,21 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
         vendor = detect_vendor_from_class(_extract_class_name_from_serialized(serialized))
         _set_span_attribute(span, SpanAttributes.LLM_SYSTEM, vendor)
         _set_span_attribute(span, SpanAttributes.LLM_REQUEST_TYPE, request_type.value)
-        _set_span_attribute(span, SpanAttributes.LLM_IS_STREAMING, False)
-        self.spans[run_id].is_streaming = False
+        
+        # we already have an LLM span by this point,
+        # so skip any downstream instrumentation from here
+        try:
+            token = context_api.attach(
+                context_api.set_value(SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY, True)
+            )
+        except Exception:
+            # If context setting fails, continue without suppression token
+            token = None
+        
+        self.spans[run_id] = SpanHolder(
+            span, token, None, [], workflow_name, None, entity_path
+        )
+        
         return span
 
     @dont_throw
@@ -431,11 +518,15 @@ class TraceloopCallbackHandler(BaseCallbackHandler):
             )
         self._end_span(span, run_id)
         if parent_run_id is None:
-            context_api.attach(
-                context_api.set_value(
-                    SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY, False
+            try:
+                context_api.attach(
+                    context_api.set_value(
+                        SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY, False
+                    )
                 )
-            )
+            except Exception:
+                # If context reset fails, it's not critical for functionality
+                pass
 
     @dont_throw
     def on_chat_model_start(

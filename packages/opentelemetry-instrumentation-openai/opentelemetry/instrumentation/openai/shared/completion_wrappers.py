@@ -26,9 +26,7 @@ from opentelemetry.instrumentation.openai.utils import (
     should_emit_events,
     should_send_prompts,
 )
-from opentelemetry.semconv_ai.genai_entry import (
-    with_genai_entry_detection,
-)
+from opentelemetry.semconv_ai.genai_entry import GENAI_ENTRY_ATTRIBUTE
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.semconv_ai import (
     SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY,
@@ -46,7 +44,6 @@ logger = logging.getLogger(__name__)
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 def completion_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY) or context_api.get_value(
         SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY
@@ -59,6 +56,7 @@ def completion_wrapper(tracer, wrapped, instance, args, kwargs):
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLM_REQUEST_TYPE.value},
     )
+    span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
 
     # Use the span as current context to ensure events get proper trace context
     with trace.use_span(span, end_on_exit=False):
@@ -84,7 +82,6 @@ def completion_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 async def acompletion_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY) or context_api.get_value(
         SUPPRESS_LANGUAGE_MODEL_INSTRUMENTATION_KEY
@@ -96,6 +93,7 @@ async def acompletion_wrapper(tracer, wrapped, instance, args, kwargs):
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLM_REQUEST_TYPE.value},
     )
+    span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
 
     # Use the span as current context to ensure events get proper trace context
     with trace.use_span(span, end_on_exit=False):

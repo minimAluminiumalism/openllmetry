@@ -37,9 +37,7 @@ from opentelemetry.instrumentation.openai.utils import (
     should_emit_events,
     should_send_prompts,
 )
-from opentelemetry.semconv_ai.genai_entry import (
-    with_genai_entry_detection,
-)
+from opentelemetry.semconv_ai.genai_entry import GENAI_ENTRY_ATTRIBUTE
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.metrics import Counter, Histogram
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
@@ -66,7 +64,6 @@ logger = logging.getLogger(__name__)
 
 
 @_with_chat_telemetry_wrapper
-@with_genai_entry_detection
 def chat_wrapper(
     tracer: Tracer,
     token_counter: Counter,
@@ -85,12 +82,12 @@ def chat_wrapper(
     ):
         return wrapped(*args, **kwargs)
     # span needs to be opened and closed manually because the response is a generator
-
     span = tracer.start_span(
         SPAN_NAME,
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLM_REQUEST_TYPE.value},
     )
+    span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
 
     # Use the span as current context to ensure events get proper trace context
     with trace.use_span(span, end_on_exit=False):
@@ -166,7 +163,6 @@ def chat_wrapper(
 
 
 @_with_chat_telemetry_wrapper
-@with_genai_entry_detection
 async def achat_wrapper(
     tracer: Tracer,
     token_counter: Counter,
@@ -190,6 +186,7 @@ async def achat_wrapper(
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLM_REQUEST_TYPE.value},
     )
+    span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
 
     # Use the span as current context to ensure events get proper trace context
     with trace.use_span(span, end_on_exit=False):

@@ -18,9 +18,7 @@ from opentelemetry.instrumentation.openai.utils import (
     dont_throw,
     should_emit_events,
 )
-from opentelemetry.semconv_ai.genai_entry import (
-    with_genai_entry_detection,
-)
+from opentelemetry.semconv_ai.genai_entry import GENAI_ENTRY_ATTRIBUTE
 
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
@@ -37,7 +35,6 @@ runs = {}
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 def assistants_create_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -53,7 +50,6 @@ def assistants_create_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 def runs_create_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -82,7 +78,6 @@ def runs_create_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 def runs_retrieve_wrapper(tracer, wrapped, instance, args, kwargs):
     @dont_throw
     def process_response(response):
@@ -114,7 +109,6 @@ def runs_retrieve_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 def messages_list_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -136,6 +130,7 @@ def messages_list_wrapper(tracer, wrapped, instance, args, kwargs):
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLMRequestTypeValues.CHAT.value},
         start_time=run.get("start_time"),
     )
+    span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
 
     # Use the span as current context to ensure events get proper trace context
     with trace.use_span(span, end_on_exit=False):
@@ -252,7 +247,6 @@ def messages_list_wrapper(tracer, wrapped, instance, args, kwargs):
 
 
 @_with_tracer_wrapper
-@with_genai_entry_detection
 def runs_create_and_stream_wrapper(tracer, wrapped, instance, args, kwargs):
     if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
         return wrapped(*args, **kwargs)
@@ -265,6 +259,7 @@ def runs_create_and_stream_wrapper(tracer, wrapped, instance, args, kwargs):
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLMRequestTypeValues.CHAT.value},
     )
+    span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
 
     i = 0
     if assistants.get(assistant_id) is not None or Config.enrich_assistant:

@@ -29,9 +29,7 @@ from opentelemetry.instrumentation.openai.utils import (
     should_send_prompts,
     start_as_current_span_async,
 )
-from opentelemetry.semconv_ai.genai_entry import (
-    with_genai_entry_detection,
-)
+from opentelemetry.semconv_ai.genai_entry import GENAI_ENTRY_ATTRIBUTE
 from opentelemetry.instrumentation.utils import _SUPPRESS_INSTRUMENTATION_KEY
 from opentelemetry.metrics import Counter, Histogram
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
@@ -52,7 +50,6 @@ logger = logging.getLogger(__name__)
 
 
 @_with_embeddings_telemetry_wrapper
-@with_genai_entry_detection
 def embeddings_wrapper(
     tracer,
     token_counter: Counter,
@@ -74,6 +71,7 @@ def embeddings_wrapper(
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLM_REQUEST_TYPE.value},
     ) as span:
+        span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
         _handle_request(span, kwargs, instance)
 
         try:
@@ -117,7 +115,6 @@ def embeddings_wrapper(
 
 
 @_with_embeddings_telemetry_wrapper
-@with_genai_entry_detection
 async def aembeddings_wrapper(
     tracer,
     token_counter: Counter,
@@ -140,6 +137,7 @@ async def aembeddings_wrapper(
         kind=SpanKind.CLIENT,
         attributes={SpanAttributes.LLM_REQUEST_TYPE: LLM_REQUEST_TYPE.value},
     ) as span:
+        span.set_attribute(GENAI_ENTRY_ATTRIBUTE, True)
         _handle_request(span, kwargs, instance)
 
         try:
